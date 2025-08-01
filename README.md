@@ -6,4 +6,4 @@ Data Movement APIs documentation will cover information about the NOC (Network o
 
 Compute Low-level kernel APIs will cover information about the Tensix Hardware for Wormhole and Blackhole devices, and expected usage for LLK APIs found [here](https://github.com/tenstorrent/tt-llk)
 
-This repository will only contain documentation, and it is recommended for OP & Model writers of tt-metal, since it will cover both the usage of the APIs, and performance. For more in depth knowledge about HW instructions and features, isa documentation can be found (here)[https://github.com/tenstorrent/tt-isa-documentation]
+This repository will only contain documentation, and it is recommended for OP & Model writers of tt-metal, since it will cover both the usage of the APIs, and performance. For more in depth knowledge about HW instructions and features, isa documentation can be found [here](https://github.com/tenstorrent/tt-isa-documentation)
