@@ -15,7 +15,7 @@ For more information on each test, refer to the README under each test primitive
 ### DRAM Interleaved Packet Sizes
 
 ![DRAM Interleaved Packet Sizes](./wormhole_b0/images/DRAM%20Interleaved%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/DRAM%20Interleaved%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/DRAM%20Interleaved%20Packet%20Sizes.csv).
 
 Dram read bandwidth saturates at about 37 B/cycle, according to HW experiments. DRAM write bandwidth should saturate at 64 B/cycle, instead of 35 B/c. There may be some configuration problem with the dram controller/phy or this may be the physical limit of the dram.
 
@@ -24,7 +24,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### One to One Packet Sizes
 
 ![One to One Packet Sizes](./wormhole_b0/images/One%20to%20One%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20One%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20One%20Packet%20Sizes.csv).
 
 Bandwidth in steady state, with > 2KB packet sizes, is close to theoretical max. Under 2KB, the bandwidth is limitted by either the RISC latency or by the NOC sending from L1 latency.
 
@@ -33,7 +33,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### Loopback Packet Sizes
 
 ![Loopback Packet Sizes](./wormhole_b0/images/Loopback%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/Loopback%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/Loopback%20Packet%20Sizes.csv).
 
 Loopback will have similar characteristics to the one to one test, however it uses two ports to send and receive data, as such it is more likely to cause contention.
 
@@ -42,7 +42,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### One from One Packet Sizes
 
 ![One from One Packet Sizes](./wormhole_b0/images/One%20from%20One%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20from%20One%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20from%20One%20Packet%20Sizes.csv).
 
 Bandwidth in steady state, with > 2KB packet sizes, is close to theoretical max. Under 2KB, the bandwidth is limitted by the RISC latency.
 
@@ -54,12 +54,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Unicast 2x2 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Unicast 2x2 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a small grid. The bandwidth characteristics are similar to the one to one test. Note that it may appear that multicast has lower bandwidth, however multicast sends less data and has much lower latency, so it is prefered to use multicast.
 
@@ -69,12 +69,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Unicast 4x4 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Unicast 4x4 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a medium grid. The bandwidth characteristics are similar to the one to one test. As the grid size increases, the number of transactions needed to saturate NOC decreases because the NOC needs to send num cores more packets. Note that it may appear that multicast has lower bandwidth, however multicast sends less data and has much lower latency, so it is prefered to use multicast.
 
@@ -84,12 +84,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Unicast 10x10 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Unicast 10x10 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid. The bandwidth characteristics are similar to the one to one test. As the grid size increases, the number of transactions needed to saturate NOC decreases because the NOC needs to send num cores more packets. Note that it may appear that multicast has lower bandwidth, however multicast sends less data and has much lower latency, so it is prefered to use multicast.
 
@@ -100,12 +100,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Unlinked 2x2 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Unlinked 2x2 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a small grid using unlinked multicast. Bandwidth degrades due to path reserve being done after every transaction.
 
@@ -115,12 +115,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Unlinked 5x5 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Unlinked 5x5 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a medium grid using unlinked multicast. Bandwidth degrades due to path reserve being done after every transaction. As the grid size increases, the number of write acks increases which degrades bandwidth.
 
@@ -130,12 +130,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Unlinked 11x10 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Unlinked 11x10 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid using unlinked multicast. Bandwidth degrades due to path reserve being done after every transaction. As the grid size increases, the number of write acks increases which degrades bandwidth.
 
@@ -146,12 +146,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Linked 2x2 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Linked 2x2 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a small grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical.
 
@@ -161,12 +161,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Linked 5x5 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Linked 5x5 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a medium grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical. As the grid size increases, the number of write acks increases which degrades bandwidth. Posted multicasts do not have this issue, however it is not safe to use posted multicast due to a hardware bug.
 
@@ -176,12 +176,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Linked 11x10 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Linked 11x10 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical. As the grid size increases, the number of write acks increases which degrades bandwidth. Posted multicasts do not have this issue, however it is not safe to use posted multicast due to a hardware bug.
 
@@ -190,7 +190,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### One from All Packet Sizes
 
 ![One from All Packet Sizes](./wormhole_b0/images/One%20from%20All%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/One%20from%20All%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20from%20All%20Packet%20Sizes.csv).
 
 At small packet sizes, the bandwidth is limited by the RISC latency. As the packet size increases, the bandwidth approaches 64 B/cycle. Similar to the one from one test.
 
@@ -199,14 +199,14 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### All to All Packet Sizes
 
 ![All to All Packet Sizes](./wormhole_b0/images/All%20to%20All%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/All%20to%20All%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/All%20to%20All%20Packet%20Sizes.csv).
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/all_to_all/README.md).
 
 ### All from All Packet Sizes
 
 ![All from All Packet Sizes](./wormhole_b0/images/All%20from%20All%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./wormhole_b0/csv/All%20from%20All%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/All%20from%20All%20Packet%20Sizes.csv).
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/all_from_all/README.md).
 
@@ -215,7 +215,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### DRAM Interleaved Packet Sizes
 
 ![DRAM Interleaved Packet Sizes](./blackhole/images/DRAM%20Interleaved%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/DRAM%20Interleaved%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/DRAM%20Interleaved%20Packet%20Sizes.csv).
 
 Dram read bandwidth saturates at about 37 B/cycle, according to HW experiments. DRAM write bandwidth should saturate at 64 B/cycle, instead of 35 B/c. There may be some configuration problem with the dram controller/phy or this may be the physical limit of the dram.
 
@@ -224,7 +224,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### One to One Packet Sizes
 
 ![One to One Packet Sizes](./blackhole/images/One%20to%20One%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20One%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20One%20Packet%20Sizes.csv).
 
 Bandwidth in steady state, with > 2KB packet sizes, is close to theoretical max. Under 2KB, the bandwidth is limitted by either the RISC latency or by the NOC sending from L1 latency.
 
@@ -233,7 +233,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### Loopback Packet Sizes
 
 ![Loopback Packet Sizes](./blackhole/images/Loopback%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/Loopback%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/Loopback%20Packet%20Sizes.csv).
 
 Loopback will have similar characteristics to the one to one test, however it uses two ports to send and receive data, as such it is more likely to cause contention.
 
@@ -242,7 +242,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### One from One Packet Sizes
 
 ![One from One Packet Sizes](./blackhole/images/One%20from%20One%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20from%20One%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20from%20One%20Packet%20Sizes.csv).
 
 Bandwidth in steady state, with > 2KB packet sizes, is close to theoretical max. Under 2KB, the bandwidth is limitted by the RISC latency.
 
@@ -254,12 +254,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Unicast 2x2 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Unicast 2x2 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Unicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a small grid. The bandwidth characteristics are similar to the one to one test. Note that it may appear that multicast has lower bandwidth, however multicast sends less data and has much lower latency, so it is prefered to use multicast.
 
@@ -269,12 +269,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Unicast 4x4 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Unicast 4x4 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Unicast%204x4%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a medium grid. The bandwidth characteristics are similar to the one to one test. As the grid size increases, the number of transactions needed to saturate NOC decreases because the NOC needs to send num cores more packets. Note that it may appear that multicast has lower bandwidth, however multicast sends less data and has much lower latency, so it is prefered to use multicast.
 
@@ -284,12 +284,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Unicast 10x10 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Unicast 10x10 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Unicast%2010x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid. The bandwidth characteristics are similar to the one to one test. As the grid size increases, the number of transactions needed to saturate NOC decreases because the NOC needs to send num cores more packets. Note that it may appear that multicast has lower bandwidth, however multicast sends less data and has much lower latency, so it is prefered to use multicast.
 
@@ -300,12 +300,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Unlinked 2x2 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Unlinked 2x2 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%202x2%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a small grid using unlinked multicast. Bandwidth degrades due to path reserve being done after every transaction.
 
@@ -315,12 +315,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Unlinked 5x5 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Unlinked 5x5 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%205x5%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a medium grid using unlinked multicast. Bandwidth degrades due to path reserve being done after every transaction. As the grid size increases, the number of write acks increases which degrades bandwidth.
 
@@ -330,12 +330,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Unlinked 11x10 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Unlinked 11x10 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid using unlinked multicast. Bandwidth degrades due to path reserve being done after every transaction. As the grid size increases, the number of write acks increases which degrades bandwidth.
 
@@ -346,12 +346,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Linked 2x2 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Linked 2x2 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%202x2%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a small grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical.
 
@@ -361,12 +361,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Linked 5x5 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Linked 5x5 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%205x5%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a medium grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical. As the grid size increases, the number of write acks increases which degrades bandwidth. Posted multicasts do not have this issue, however it is not safe to use posted multicast due to a hardware bug.
 
@@ -376,12 +376,12 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ##### With Loopback
 
 ![One to All Multicast Linked 11x10 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20with%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20with%20Loopback.csv).
 
 ##### Without Loopback
 
 ![One to All Multicast Linked 11x10 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical. As the grid size increases, the number of write acks increases which degrades bandwidth. Posted multicasts do not have this issue, however it is not safe to use posted multicast due to a hardware bug.
 
@@ -390,7 +390,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### One from All Packet Sizes
 
 ![One from All Packet Sizes](./blackhole/images/One%20from%20All%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/One%20from%20All%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20from%20All%20Packet%20Sizes.csv).
 
 At small packet sizes, the bandwidth is limited by the RISC latency. As the packet size increases, the bandwidth approaches 64 B/cycle. Similar to the one from one test.
 
@@ -399,13 +399,13 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### All to All Packet Sizes
 
 ![All to All Packet Sizes](./blackhole/images/All%20to%20All%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/All%20to%20All%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/All%20to%20All%20Packet%20Sizes.csv).
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/all_to_all/README.md).
 
 ### All from All Packet Sizes
 
 ![All from All Packet Sizes](./blackhole/images/All%20from%20All%20Packet%20Sizes.png)
-To view these results in a table, refer to the relevant [Markdown file](./blackhole/csv/All%20from%20All%20Packet%20Sizes.csv).
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/All%20from%20All%20Packet%20Sizes.csv).
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/all_from_all/README.md).
