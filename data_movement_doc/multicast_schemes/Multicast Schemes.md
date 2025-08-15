@@ -71,6 +71,6 @@ The diagrams below visualize write paths versus acknowledge paths for representa
 
 ## Recommendations
 
-- Prefer placements that avoid sharing the congested write path with the acknowledge path:
+- Try to use configurations that avoid sharing the congested write path with the acknowledge path:
   - NoC 0: Avoid column-shared placements (6, 9) when possible
   - NoC 1: Avoid row-shared placements (5, 8) when possible
