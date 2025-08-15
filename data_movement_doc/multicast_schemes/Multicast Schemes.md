@@ -74,5 +74,3 @@ The diagrams below visualize write paths versus acknowledge paths for representa
 - Prefer placements that avoid sharing the congested write path with the acknowledge path:
   - NoC 0: Avoid column-shared placements (6, 9) when possible
   - NoC 1: Avoid row-shared placements (5, 8) when possible
-[//]: # (- For inside-the-grid senders (1–4), favor configurations without loopback if correctness and programming model permit. NOTE: Not sure whether to include this or not since loopback is always advised when doing multicast writes)
-[//]: # (- Treat VC selection as orthogonal: do not expect VC changes to rescue throughput when the physical path is saturated. NOTE: Not sure if this note is worth including at all)
