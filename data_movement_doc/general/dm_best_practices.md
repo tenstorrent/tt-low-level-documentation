@@ -6,7 +6,7 @@ This guide focuses on performance optimization and common pitfalls when using TT
 
 ### 1. **Missing or Misplaced Barriers**
 
-**The Problem:** NOC operations are asynchronous. Without proper barriers, your kernel will continue executing while data is still in flight, leading to race conditions, corrupted data, or complete hangs.
+**The Problem:** NOC operations are asynchronous by design, allowing for high throughput by keeping multiple transactions in flight. However, without proper synchronization at critical points, your kernel may proceed before required data has arrived, potentially causing race conditions, data corruption, or hangs. The kernel writer should use barriers selectively to enforce correctness without unnecessarily stalling execution.
 
 ```cpp
 // WRONG - No barrier, data might not be ready
@@ -133,7 +133,7 @@ uint64_t mcast_addr = get_noc_multicast_addr(x_start, y_start, x_end, y_end, loc
 noc_async_write_multicast(src_addr, mcast_addr, size, num_cores);
 ```
 
-### 6. **Understanding Virtual Channels**
+### 6. **Understanding Virtual Channels,** [Full Guide](https://github.com/tenstorrent/tt-low-level-documentation/blob/main/data_movement_doc/virtual_channels/Virtual%20Channels.md)
 
 Use multiple VCs to separate traffic of different classes, not to parallelize the same-class traffic to the same destination.
 
@@ -217,7 +217,7 @@ void optimized_data_movement() {
 }
 ```
 
-## API Quick Reference
+## API Quick Reference, [Full Guide](https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis.html#data-movement)
 
 ### Core Read APIs
 - `noc_async_read()` - General purpose async read
