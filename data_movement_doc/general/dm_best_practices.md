@@ -45,7 +45,8 @@ for (uint32_t batch = 0; batch < num_tiles; batch += batch_size) {
 - After a batch of `noc_async_read` operations before using the data
 - Before kernel termination if you have outstanding writes
 - Before changing NOC state or switching contexts
-- When NOC command buffers are getting full
+- When NOC command buffers are getting full. This means that the buffers are at capacity, they can't accept any more commands 
+  right now. If the buffer is full, the code enters a waiting loop until space becomes available. This creates backpressure in the system.
 
 **Performance tips:** 
 - Batch multiple operations before using barriers to maximize async benefits
@@ -71,8 +72,10 @@ cb_push_back(cb_id, 1);  // Matches reserve
 ```
 
 **Critical CB rules:**
-- `cb_reserve_back(n)` must always be followed by `cb_push_back(n)` with the same n
-- `cb_wait_front(n)` must always be followed by `cb_pop_front(n)` with the same n
+- `cb_reserve_back(cb_id, n)` must be followed by one or more calls to `cb_push_back(cb_id, y)` 
+  such that the total number of elements pushed equals `n` (i.e., `n = x * y`, where `x` 
+  is the number of `cb_push_back` calls and `y` is the number of elements per call).
+- The same principle applies to `cb_wait_front(n)` and `cb_pop_front(n)`.
 - CB size must be evenly divisible by the number of pages you request
 
 ### 3. **Inefficient State Management**
@@ -139,6 +142,11 @@ Use multiple VCs to separate traffic of different classes, not to parallelize th
 
 **Flow-control/credit messages:** Should use a VC separate from data. For example, if the traffic indicates how much buffer space was freed, it should be placed on a VC separate from data.
 
+**Available VCs:** Although there are 16 total virtual channels, software can only use a subset of that.
+For Unicast operations, valid VC values are 0,1,2,3.
+For Multicast operations, VC 4 is the only one which can be used.
+
+Other VCs are reserved for system use.
 
 ```cpp
 // Example: Separate DRAM (slow) from L1 (fast) traffic
