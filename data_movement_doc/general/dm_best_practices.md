@@ -82,6 +82,14 @@ cb_push_back(cb_id, 1);  // Matches reserve
 
 **The Problem:** Reconfiguring NOC state for every operation when you could reuse it.
 
+**When to use Stateful APIs:**
+
+Use stateful APIs when performing multiple operations to the same destination or with similar configurations. Stateful APIs provide significant performance benefits by reducing register programming overhead. The NoC registers preserve their values across calls, avoiding unnecessary writes. 
+
+**When to use Stateless APIs:**
+
+For isolated transactions where the setup overhead isn't amortized across multiple operations, destinations or parameters change significantly between operations, making state preservation less beneficial.
+
 ```cpp
 // SLOW - Reconfigures NOC state every iteration
 for (uint32_t i = 0; i < num_writes; i++) {
@@ -209,7 +217,7 @@ void optimized_data_movement() {
     // DRAM operations on separate VC (different bandwidth class)
     noc_async_read(dram_addr, l1_addr, size, noc_id, DRAM_VC);
     
-    // L1 operations (same bandwidth class as Ethernet)
+    // L1 operations (same bandwidth class as` Ethernet)
     noc_async_write(l1_src, l1_dst, size, noc_id, L1_ETHERNET_VC);
     
     // Flow control messages separate from data
