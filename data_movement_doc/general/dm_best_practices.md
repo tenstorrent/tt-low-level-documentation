@@ -19,9 +19,17 @@ for (uint32_t i = 0; i < num_tiles; i++) {
     noc_async_read_barrier();  // BAD: Destroys async benefits
     process_tile(dst_addr);
 }
+```
+```cpp
+constexpr uint32_t NOC_COMPUTE_BALANCED_BATCH_SIZE = 4; //Example value
+// The batch size should be chosen by two criteria:
+// - Balance NOC utilization: Not too small (which would underutilize the NOC's async capabilities)
+// - Balance compute parallelism: Not too large (which would leave compute idle while waiting for large batches to arrive)
+```
 
+```cpp
 // CORRECT - Batch operations, then barrier
-constexpr uint32_t batch_size = 4;  // Don't saturate NOC
+constexpr uint32_t batch_size = NOC_COMPUTE_BALANCED_BATCH_SIZE;
 for (uint32_t batch = 0; batch < num_tiles; batch += batch_size) {
     uint32_t tiles_in_batch = std::min(batch_size, num_tiles - batch);
     
