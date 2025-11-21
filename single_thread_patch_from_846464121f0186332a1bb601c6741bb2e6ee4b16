@@ -1,0 +1,1827 @@
+diff --git a/exports.sh b/exports.sh
+new file mode 100644
+index 0000000000..c650ed3530
+--- /dev/null
++++ b/exports.sh
+@@ -0,0 +1,4 @@
++export TT_METAL_ENV=dev
++export TT_METAL_HOME=`pwd`
++export PYTHONPATH=$(pwd)
++export ARCH_NAME=blackhole
+diff --git a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_pack_api.h b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_pack_api.h
+index 09bdf39c97..0122401be1 100644
+--- a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_pack_api.h
++++ b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_pack_api.h
+@@ -17,7 +17,6 @@
+ #include "llk_pack_common.h"
+ #include "llk_pack_untilize.h"
+ #include "llk_param_structs.h"
+-
+ /*************************************************************************
+  * LLK PACK
+  *************************************************************************/
+@@ -171,6 +170,27 @@ inline void llk_pack_init(const std::uint32_t pack_output = 16) {
+     TT_SETADCXX(p_setadc::PAC, FACE_C_DIM - 1, 0x0);
+ }
+ 
++template <bool untilize = false, bool zero_output = false, bool tilize = false>
++inline void llk_pack_init_st(const std::uint32_t pack_output = 16) {
++    // TODO (https://github.com/tenstorrent/tt-metal/issues/18948): Revisit for narrow_tile
++    const std::uint32_t output_id = get_output_id(pack_output);
++    const std::uint32_t face_r_dim = get_output_face_r_dim(output_id);
++    const std::uint32_t tile_c_dim = get_output_tile_c_dim(output_id);
++    const std::uint32_t num_faces = get_output_num_faces(output_id);
++    const bool partial_face = get_output_partial_face(output_id);
++    const bool narrow_tile = get_output_narrow_tile(output_id);
++
++    // Since this is for single threaded programming we do not initialize the mop
++    // to avoid contending with unpacker threads mop
++    _llk_pack_init_st_<untilize, zero_output, DstTileFaceLayout::RowMajor, false, tilize>(
++        pack_dst_format[output_id], face_r_dim, tile_c_dim, num_faces, partial_face, narrow_tile);
++
++    set_packer_strides<untilize, tilize>(pack_src_format[output_id], pack_dst_format[output_id], tile_c_dim);
++
++    // Program packer to pack out 16 datums per row
++    TT_SETADCXX(p_setadc::PAC, FACE_C_DIM - 1, 0x0);
++}
++
+ template <bool out_of_order_output, bool untilize>
+ inline std::uint32_t get_output_tile_address(std::uint8_t output_id, std::uint32_t output_tile_index) {
+     std::uint32_t pack_tile_addr;
+@@ -200,6 +220,17 @@ inline void llk_pack(std::uint32_t tile_index, std::uint32_t output, std::uint32
+     _llk_pack_<DST_SYNC_MODE, untilize, is_fp32_dest_acc_en>(tile_index, pack_tile_addr);
+ }
+ 
++template <bool out_of_order_output = false, bool untilize = false, bool is_fp32_dest_acc_en = false>
++inline void llk_pack_st(std::uint32_t tile_index, std::uint32_t output, std::uint32_t output_tile_index = 0) {
++    std::uint8_t output_id = get_output_id(output);
++
++    static_assert((!(untilize && out_of_order_output)) && "untilize out of order packing is not supported!");
++
++    std::uint32_t pack_tile_addr = get_output_tile_address<out_of_order_output, untilize>(output_id, output_tile_index);
++
++    _llk_pack_st_<DST_SYNC_MODE, untilize, is_fp32_dest_acc_en>(tile_index, pack_tile_addr);
++}
++
+ /*************************************************************************
+  * LLK PACK UNTILIZE
+  *************************************************************************/
+diff --git a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu/llk_math_eltwise_unary_sfpu_abs.h b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu/llk_math_eltwise_unary_sfpu_abs.h
+index ad3f490b0b..c300503e72 100644
+--- a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu/llk_math_eltwise_unary_sfpu_abs.h
++++ b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu/llk_math_eltwise_unary_sfpu_abs.h
+@@ -14,7 +14,7 @@ namespace ckernel {
+ 
+ template <bool APPROXIMATE>
+ inline void llk_math_eltwise_unary_sfpu_abs_init() {
+-    llk_math_eltwise_unary_sfpu_init<SfpuType::abs, APPROXIMATE>();
++    llk_math_eltwise_unary_sfpu_init<SfpuType::sfpu_abs, APPROXIMATE>();
+ }
+ 
+ template <bool APPROXIMATE>
+diff --git a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu_types.h b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu_types.h
+index cf27bf1206..07a069c34b 100644
+--- a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu_types.h
++++ b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu_types.h
+@@ -29,7 +29,7 @@ enum SfpuType {
+     clamp,
+     gelu_derivative,
+     dropout,
+-    abs,
++    sfpu_abs,
+     abs_int32,
+     sign,
+     max,
+@@ -42,7 +42,7 @@ enum SfpuType {
+     sigmoid_appx,
+     gelu_appx,
+     elu,
+-    min,
++    sfpu_min,
+     exp2,
+     heaviside,
+     expm1,
+diff --git a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_unpack_AB_api.h b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_unpack_AB_api.h
+index dc58197b0c..f8976b2b5c 100644
+--- a/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_unpack_AB_api.h
++++ b/tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_unpack_AB_api.h
+@@ -10,6 +10,20 @@
+  * LLK UNPACK AB
+  *************************************************************************/
+ 
++inline void llk_unpack_AB_init_st(
++    const std::uint32_t operandA,
++    const std::uint32_t operandB,
++    const std::uint32_t transpose = 0,
++    const std::uint32_t acc_to_dest = 0) {
++    const std::uint32_t operandA_id = get_operand_id(operandA);
++    const std::uint32_t face_r_dim = get_operand_face_r_dim(operandA_id);  // face r dim in unpA and unpB are the same
++    const std::uint32_t num_faces = get_operand_num_faces(operandA_id);
++    const bool narrow_tile =
++        get_operand_narrow_tile(operandA_id);  // if narrow tile read face 0 twice for row broadcast
++
++    _llk_unpack_AB_init_st_(face_r_dim, num_faces, narrow_tile, transpose, acc_to_dest);
++}
++
+ template <bool is_fp32_dest_acc_en = false, StochRndType stoch_rnd_mode = StochRndType::None>
+ inline void llk_unpack_AB_hw_configure(
+     const llk_unpack_AB_params_t* unpack_AB_params, const int within_face_16x16_transpose = 0) {
+@@ -64,6 +78,27 @@ inline void llk_unpack_AB_init(
+     _llk_unpack_AB_init_<BType>(face_r_dim, num_faces, narrow_tile, transpose, acc_to_dest);
+ }
+ 
++inline void llk_unpack_AB_st(
++    const std::uint32_t operandA,
++    const std::uint32_t operandB,
++    const std::uint32_t tile_index_a,
++    const std::uint32_t tile_index_b,
++    const std::uint32_t dst_index,
++    const bool transpose_of_faces = 0 /*not used*/) {
++    std::uint32_t operandA_id = get_operand_id(operandA);
++    std::uint32_t operandB_id = get_operand_id(operandB);
++    std::uint32_t base_address_a = get_local_cb_interface(operandA_id).fifo_rd_ptr - 1;
++    std::uint32_t offset_address_a = get_local_cb_interface(operandA_id).fifo_page_size * tile_index_a;
++    std::uint32_t address_a = base_address_a + offset_address_a;
++    std::uint32_t base_address_b = get_local_cb_interface(operandB_id).fifo_rd_ptr - 1;
++    std::uint32_t offset_address_b = get_local_cb_interface(operandB_id).fifo_page_size * tile_index_b;
++    std::uint32_t address_b = base_address_b + offset_address_b;
++
++    WAYPOINT("UABW");
++    _llk_unpack_AB_st_(address_a, address_b, dst_index, transpose_of_faces > 0);
++    WAYPOINT("UABD");
++}
++
+ template <BroadcastType BType = BroadcastType::NONE>
+ inline void llk_unpack_AB(
+     const std::uint32_t operandA,
+diff --git a/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_operands.h b/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_operands.h
+index b8f33b36b9..6978796d83 100644
+--- a/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_operands.h
++++ b/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_operands.h
+@@ -5,6 +5,7 @@
+ #pragma once
+ #include <cstdint>
+ #include <vector>
++#include "chlkc_unpack_data_format.h"
+ 
+ inline uint32_t get_operand_id(uint32_t operand) { return (operand); }
+ 
+diff --git a/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_outputs.h b/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_outputs.h
+index 1d2829de63..2361393200 100644
+--- a/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_outputs.h
++++ b/tt_metal/hw/ckernels/blackhole/metal/llk_io/llk_outputs.h
+@@ -5,6 +5,7 @@
+ #pragma once
+ #include <cstdint>
+ #include <vector>
++#include "chlkc_pack_data_format.h"
+ 
+ // Metal specific overrides -- No support for partial tiles so hard-code to fixed 32x32 sizes
+ inline uint32_t get_output_id(uint32_t output) { return (output); }
+diff --git a/tt_metal/hw/firmware/src/trisc.cc b/tt_metal/hw/firmware/src/trisc.cc
+index 729b32a14b..b6405b8910 100644
+--- a/tt_metal/hw/firmware/src/trisc.cc
++++ b/tt_metal/hw/firmware/src/trisc.cc
+@@ -39,6 +39,19 @@ uint8_t my_logical_y_ __attribute__((used));
+ uint8_t my_relative_x_ __attribute__((used));
+ uint8_t my_relative_y_ __attribute__((used));
+ 
++// These arrays are stored in local memory of FW, but primarily used by the kernel which shares
++// FW symbols. Hence mark these as 'used' so that FW compiler doesn't optimize it out.
++uint32_t noc_reads_num_issued[NUM_NOCS] __attribute__((used));
++uint32_t noc_nonposted_writes_num_issued[NUM_NOCS] __attribute__((used));
++uint32_t noc_nonposted_writes_acked[NUM_NOCS] __attribute__((used));
++uint32_t noc_nonposted_atomics_acked[NUM_NOCS] __attribute__((used));
++uint32_t noc_posted_writes_num_issued[NUM_NOCS] __attribute__((used));
++
++uint16_t dram_bank_to_noc_xy[NUM_NOCS][NUM_DRAM_BANKS] __attribute__((used));
++uint16_t l1_bank_to_noc_xy[NUM_NOCS][NUM_L1_BANKS] __attribute__((used));
++int32_t bank_to_dram_offset[NUM_DRAM_BANKS] __attribute__((used));
++int32_t bank_to_l1_offset[NUM_L1_BANKS] __attribute__((used));
++
+ namespace ckernel {
+ 
+ enum class ttRiscCores : std::uint32_t { Unpack = 0, Math = 1, Pack = 2, Brisc = 3, Nrisc = 4 };
+@@ -68,16 +81,12 @@ uint32_t tt_l1_ptr *cb_l1_base __attribute__((used));
+ CBInterface cb_interface[NUM_CIRCULAR_BUFFERS] __attribute__((used));
+ #endif
+ 
+-#if defined(UCK_CHLKC_UNPACK)
++// These were conditionally set to true/false
++// do avoid writing, but both being true should
++// work, as read and write initializes read and
++// write pointers respectively.
+ constexpr bool cb_init_read = true;
+-#else
+-constexpr bool cb_init_read = false;
+-#endif
+-#if defined(UCK_CHLKC_PACK)
+ constexpr bool cb_init_write = true;
+-#else
+-constexpr bool cb_init_write = false;
+-#endif
+ 
+ using namespace ckernel;
+ 
+@@ -98,6 +107,8 @@ int main(int argc, char *argv[]) {
+ 
+     do_crt1((uint32_t tt_l1_ptr *)PREPROCESSOR_EXPAND(MEM_TRISC, COMPILE_FOR_TRISC, _INIT_LOCAL_L1_BASE_SCRATCH));
+ 
++    noc_bank_table_init(MEM_BANK_TO_NOC_SCRATCH);
++
+     // Initialize GPRs to all 0s
+ #pragma GCC unroll 0
+     for (int i = 0; i < 64; i++) regfile[i] = 0;
+diff --git a/tt_metal/hw/firmware/src/trisck.cc b/tt_metal/hw/firmware/src/trisck.cc
+index 13a2005ec4..738a66fd45 100644
+--- a/tt_metal/hw/firmware/src/trisck.cc
++++ b/tt_metal/hw/firmware/src/trisck.cc
+@@ -52,6 +52,11 @@ uint32_t kernel_launch(uint32_t kernel_base_addr) {
+   do_crt1((
+       uint32_t tt_l1_ptr *)(kernel_base_addr + (uint32_t)__kernel_init_local_l1_base - (uint32_t)__fw_export_text_end));
+ 
++    if constexpr (NOC_MODE == DM_DEDICATED_NOC) {
++	// The initialization happens in local memory
++        noc_local_state_init(NOC_INDEX);
++    }
++
+ #if defined(UCK_CHLKC_UNPACK)
+     // Make sure DBG_FEATURE_DISABLE register is cleared before every kernel is executed
+     memory_write(RISCV_DEBUG_REG_DBG_FEATURE_DISABLE, 0);
+diff --git a/tt_metal/hw/inc/blackhole/noc_nonblocking_api.h b/tt_metal/hw/inc/blackhole/noc_nonblocking_api.h
+index 64f7edcbed..af54e8dc1f 100644
+--- a/tt_metal/hw/inc/blackhole/noc_nonblocking_api.h
++++ b/tt_metal/hw/inc/blackhole/noc_nonblocking_api.h
+@@ -13,9 +13,12 @@
+ #if defined(COMPILE_FOR_BRISC)
+ constexpr std::underlying_type_t<TensixProcessorTypes> proc_type =
+     static_cast<std::underlying_type_t<TensixProcessorTypes>>(TensixProcessorTypes::DM0);
+-#else
++#elif defined(COMPILE_FOR_NCRISC)
+ constexpr std::underlying_type_t<TensixProcessorTypes> proc_type =
+     static_cast<std::underlying_type_t<TensixProcessorTypes>>(TensixProcessorTypes::DM1);
++#else
++constexpr std::underlying_type_t<TensixProcessorTypes> proc_type =
++    static_cast<std::underlying_type_t<TensixProcessorTypes>>(TensixProcessorTypes::MATH0);
+ #endif
+ 
+ // Helper functions to convert NoC coordinates to NoC-0 coordinates, used in metal as "physical" coordinates.
+@@ -75,7 +78,7 @@ static constexpr uint8_t NUM_BARRIER_TYPES = static_cast<uint32_t>(NocBarrierTyp
+ 
+ template <uint8_t proc_t, NocBarrierType barrier_type>
+ inline __attribute__((always_inline)) uint32_t get_noc_counter_address(uint32_t noc) {
+-    static_assert(proc_t < MaxDMProcessorsPerCoreType);
++    // static_assert(proc_t < MaxDMProcessorsPerCoreType);
+     static_assert(static_cast<std::underlying_type_t<NocBarrierType>>(barrier_type) < NUM_BARRIER_TYPES);
+     constexpr uint32_t offset =
+         MEM_NOC_COUNTER_BASE +
+@@ -172,7 +175,7 @@ inline __attribute__((always_inline)) void ncrisc_noc_fast_read(
+ inline __attribute__((always_inline)) bool ncrisc_dynamic_noc_reads_flushed(uint32_t noc) {
+     uint32_t status_reg_val = NOC_STATUS_READ_REG(noc, NIU_MST_RD_RESP_RECEIVED);
+     uint32_t self_risc_acked = get_noc_counter_val<proc_type, NocBarrierType::READS_NUM_ISSUED>(noc);
+-    uint32_t other_risc_acked = get_noc_counter_val<1 - proc_type, NocBarrierType::READS_NUM_ISSUED>(noc);
++    uint32_t other_risc_acked = 0;  // get_noc_counter_val<1 - proc_type, NocBarrierType::READS_NUM_ISSUED>(noc);
+     return (status_reg_val == (self_risc_acked + other_risc_acked));
+ }
+ 
+@@ -333,7 +336,8 @@ inline __attribute__((always_inline)) void ncrisc_noc_blitz_write_setup(
+ inline __attribute__((always_inline)) bool ncrisc_dynamic_noc_nonposted_writes_sent(uint32_t noc) {
+     uint32_t status_reg_val = NOC_STATUS_READ_REG(noc, NIU_MST_NONPOSTED_WR_REQ_SENT);
+     uint32_t self_risc_acked = get_noc_counter_val<proc_type, NocBarrierType::NONPOSTED_WRITES_NUM_ISSUED>(noc);
+-    uint32_t other_risc_acked = get_noc_counter_val<1 - proc_type, NocBarrierType::NONPOSTED_WRITES_NUM_ISSUED>(noc);
++    uint32_t other_risc_acked =
++        0;  // get_noc_counter_val<1 - proc_type, NocBarrierType::NONPOSTED_WRITES_NUM_ISSUED>(noc);
+     return (status_reg_val == (self_risc_acked + other_risc_acked));
+ }
+ 
+@@ -344,7 +348,8 @@ inline __attribute__((always_inline)) bool ncrisc_noc_nonposted_writes_sent(uint
+ inline __attribute__((always_inline)) bool ncrisc_dynamic_noc_posted_writes_sent(uint32_t noc) {
+     uint32_t status_reg_val = NOC_STATUS_READ_REG(noc, NIU_MST_POSTED_WR_REQ_SENT);
+     uint32_t self_risc_acked = get_noc_counter_val<proc_type, NocBarrierType::POSTED_WRITES_NUM_ISSUED>(noc);
+-    uint32_t other_risc_acked = get_noc_counter_val<1 - proc_type, NocBarrierType::POSTED_WRITES_NUM_ISSUED>(noc);
++    uint32_t other_risc_acked = 0;  // get_noc_counter_val<1 - proc_type,
++                                    // NocBarrierType::POSTED_WRITES_NUM_ISSUED>(noc);
+     return (status_reg_val == (self_risc_acked + other_risc_acked));
+ }
+ 
+@@ -355,7 +360,7 @@ inline __attribute__((always_inline)) bool ncrisc_noc_posted_writes_sent(uint32_
+ inline __attribute__((always_inline)) bool ncrisc_dynamic_noc_nonposted_writes_flushed(uint32_t noc) {
+     uint32_t status_reg_val = NOC_STATUS_READ_REG(noc, NIU_MST_WR_ACK_RECEIVED);
+     uint32_t self_risc_acked = get_noc_counter_val<proc_type, NocBarrierType::NONPOSTED_WRITES_ACKED>(noc);
+-    uint32_t other_risc_acked = get_noc_counter_val<1 - proc_type, NocBarrierType::NONPOSTED_WRITES_ACKED>(noc);
++    uint32_t other_risc_acked = 0;  // get_noc_counter_val<1 - proc_type, NocBarrierType::NONPOSTED_WRITES_ACKED>(noc);
+     return (status_reg_val == (self_risc_acked + other_risc_acked));
+ }
+ 
+@@ -376,7 +381,7 @@ inline __attribute__((always_inline)) bool ncrisc_noc_nonposted_write_with_trans
+ inline __attribute__((always_inline)) bool ncrisc_dynamic_noc_nonposted_atomics_flushed(uint32_t noc) {
+     uint32_t status_reg_val = NOC_STATUS_READ_REG(noc, NIU_MST_ATOMIC_RESP_RECEIVED);
+     uint32_t self_risc_acked = get_noc_counter_val<proc_type, NocBarrierType::NONPOSTED_ATOMICS_ACKED>(noc);
+-    uint32_t other_risc_acked = get_noc_counter_val<1 - proc_type, NocBarrierType::NONPOSTED_ATOMICS_ACKED>(noc);
++    uint32_t other_risc_acked = 0;  // get_noc_counter_val<1 - proc_type, NocBarrierType::NONPOSTED_ATOMICS_ACKED>(noc);
+     return (status_reg_val == (self_risc_acked + other_risc_acked));
+ }
+ 
+diff --git a/tt_metal/hw/inc/dataflow_api.h b/tt_metal/hw/inc/dataflow_api.h
+index b06573eabb..9dbcb08830 100644
+--- a/tt_metal/hw/inc/dataflow_api.h
++++ b/tt_metal/hw/inc/dataflow_api.h
+@@ -31,6 +31,8 @@
+ #include "dataflow_api_addrgen.h"
+ #include "tools/profiler/kernel_profiler.hpp"
+ 
++#if not defined(COMPILE_FOR_TRISC)
++
+ // clang-format off
+ /**
+  * Returns the absolute logical X coordinate value that this kernel is running on. The absolute coordinate
+@@ -151,6 +153,8 @@ FORCE_INLINE T get_common_arg_val(int arg_idx) {
+     return *((tt_l1_ptr T*)(get_common_arg_addr(arg_idx)));
+ }
+ 
++#endif
++
+ // clang-format off
+ /**
+  * Pushes a given number of tiles in the back of the specified CB’s queue.
+@@ -534,7 +538,6 @@ inline void noc_async_read(
+         Read responses - assigned VCs dynamically
+     */
+     RECORD_NOC_EVENT_WITH_ADDR(NocEventType::READ,src_noc_addr,size, -1);
+-
+     if constexpr (max_page_size <= NOC_MAX_BURST_SIZE) {
+         noc_async_read_one_packet(src_noc_addr, dst_local_l1_addr, size, noc);
+     } else {
+@@ -1993,3 +1996,66 @@ void noc_async_write_barrier_with_trid(uint32_t trid, uint8_t noc = noc_index) {
+     invalidate_l1_cache();
+     WAYPOINT("NWTD");
+ }
++
++#if defined(COMPILE_FOR_TRISC)
++
++namespace single_thread {
++
++FORCE_INLINE
++void cb_push_back_df(const int32_t operand, const int32_t num_pages) {
++    uint32_t num_words = num_pages * get_local_cb_interface(operand).fifo_page_size;
++
++    volatile tt_reg_ptr uint32_t* pages_received_ptr = get_cb_tiles_received_ptr(operand);
++    pages_received_ptr[0] += num_pages;
++
++    get_local_cb_interface(operand).fifo_wr_ptr += num_words;
++
++    // this will basically reset fifo_wr_ptr to fifo_addr -- no other wrap is legal
++    // producer always writes into contiguous memory, it cannot wrap
++    ASSERT(get_local_cb_interface(operand).fifo_wr_ptr <= get_local_cb_interface(operand).fifo_limit);
++    if (get_local_cb_interface(operand).fifo_wr_ptr == get_local_cb_interface(operand).fifo_limit) {
++        // TODO: change this to fifo_wr_ptr
++        get_local_cb_interface(operand).fifo_wr_ptr -= get_local_cb_interface(operand).fifo_size;
++    }
++}
++
++FORCE_INLINE
++void cb_pop_front_df(int32_t operand, int32_t num_pages) {
++    volatile tt_reg_ptr uint32_t* pages_acked_ptr = get_cb_tiles_acked_ptr(operand);
++    pages_acked_ptr[0] += num_pages;
++
++    uint32_t num_words = num_pages * get_local_cb_interface(operand).fifo_page_size;
++
++    get_local_cb_interface(operand).fifo_rd_ptr += num_words;
++
++    // this will basically reset fifo_rd_ptr to fifo_addr -- no other wrap is legal
++    // consumer always reads from contiguous memory, it cannot wrap
++    ASSERT(get_local_cb_interface(operand).fifo_rd_ptr <= get_local_cb_interface(operand).fifo_limit);
++    if (get_local_cb_interface(operand).fifo_rd_ptr == get_local_cb_interface(operand).fifo_limit) {
++        // TODO: change this to fifo_wr_ptr
++        get_local_cb_interface(operand).fifo_rd_ptr -= get_local_cb_interface(operand).fifo_size;
++    }
++}
++
++inline void cb_push_back_from_dram(
++    uint32_t dram_bank_id, uint32_t dram_addr, uint32_t cb_id, uint32_t num_tiles, uint32_t noc = noc_index) {
++    UNPACK(uint32_t tile_size_bytes = get_tile_size(cb_id);
++           uint64_t dram_noc_addr = get_noc_addr_from_bank_id<true>(dram_bank_id, dram_addr);
++           uint32_t l1_write_addr = get_write_ptr(cb_id);
++           noc_async_read(dram_noc_addr, l1_write_addr << 4, tile_size_bytes * num_tiles, noc);
++           noc_async_read_barrier(noc);
++           cb_push_back_df(cb_id, num_tiles););
++}
++
++inline void cb_pop_front_to_dram(
++    uint32_t dram_bank_id, uint32_t dram_addr, uint32_t cb_id, uint32_t num_tiles, uint32_t noc = noc_index) {
++    UNPACK(uint32_t tile_size_bytes = get_tile_size(cb_id);
++           uint64_t dram_noc_addr = get_noc_addr_from_bank_id<true>(dram_bank_id, dram_addr);
++           uint32_t l1_read_addr = get_read_ptr(cb_id);
++           noc_async_write(l1_read_addr << 4, dram_noc_addr, tile_size_bytes * num_tiles, noc);
++           noc_async_write_barrier(noc);
++           cb_pop_front_df(cb_id, num_tiles););
++}
++
++}  // namespace single_thread
++#endif
+diff --git a/tt_metal/hw/inc/debug/dprint.h b/tt_metal/hw/inc/debug/dprint.h
+index 6da50f0055..6d453d9f98 100644
+--- a/tt_metal/hw/inc/debug/dprint.h
++++ b/tt_metal/hw/inc/debug/dprint.h
+@@ -6,6 +6,7 @@
+ 
+ #include "risc_common.h"
+ 
++inline __attribute__((always_inline)) void invalidate_l1_cache();
+ /*
+  * Device-side debug print API for device kernels.
+  * Works on either one of NC/BR/TR threads.
+diff --git a/tt_metal/impl/kernels/kernel.cpp b/tt_metal/impl/kernels/kernel.cpp
+index 12b077b7d8..0a04055b1b 100644
+--- a/tt_metal/impl/kernels/kernel.cpp
++++ b/tt_metal/impl/kernels/kernel.cpp
+@@ -151,6 +151,7 @@ void ComputeKernel::process_defines(
+         callback(define, value);
+     }
+     // pass default noc mode as compute does not need it, just for compile to pass
++    callback("NOC_INDEX", std::to_string(NOC::NOC_1));
+     callback("NOC_MODE", std::to_string(NOC_MODE::DM_DEDICATED_NOC));
+ }
+ 
+diff --git a/tt_metal/include/compute_kernel_api/cb_api.h b/tt_metal/include/compute_kernel_api/cb_api.h
+index cc51f52869..90e48cbb6e 100644
+--- a/tt_metal/include/compute_kernel_api/cb_api.h
++++ b/tt_metal/include/compute_kernel_api/cb_api.h
+@@ -9,11 +9,65 @@
+ #include "llk_io_pack.h"
+ #endif
+ #ifdef TRISC_UNPACK
++#include "llk_io_pack.h"
+ #include "llk_io_unpack.h"
+ #endif
+ 
+ namespace ckernel {
+ 
++// clang-format off
++/**
++ * A blocking call that waits for the specified number of tiles to be free in the specified circular buffer. This call
++ * is used by the producer to wait for the consumer to consume (ie. free up) the specified number of tiles.
++ *
++ * CB total size must be an even multiple of the argument passed to this call.
++ *
++ * Return value: None
++ *
++ * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
++ * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | ntiles    | The number of free tiles to wait for | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
++ */
++// clang-format on
++ALWI void cb_reserve_back_(uint32_t cbid, uint32_t ntiles) {
++    UNPACK((llk_wait_for_free_tiles<false, false, false>(cbid, ntiles)));
++}
++
++// clang-format off
++/**
++ * Pushes a given number of tiles in the back of the specified CB’s queue.
++ * Decreases the available space in the circular buffer by this number of
++ * tiles. This call is used by the producer to make the tiles visible to the
++ * consumer of the CB.
++ *
++ * We use the convention that the producer pushes tiles into the “back” of the
++ * CB queue and the consumer consumes tiles from the “front” of the CB queue.
++ *
++ * Note that the act of writing the tile data into the CB does not make the
++ * tiles visible to the consumer. Writing of the tiles and pushing is separated
++ * to allow the producer to: 1) write the tile data to the CB via multiple
++ * writes of sub-tiles 2) modify tiles (or sub-tiles) by random access of the
++ * valid section of the CB
++ *
++ * Important note: This operation updates the write pointer of the CB, the CB pointer
++ * can only be updated from one thread at a time. Example: if compute kernel has cb_push_back(output_id, 1)
++ * and reader kernel also has cb_push_back(output_id, 1), these calls will produce non-deterministic behavior because
++ * cb pointers are not synchronized across threads. Per circular buffer index, only have one thread push tiles
++ * to update the write pointer
++ *
++ * Return value: None
++ *
++ * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
++ * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | ntiles    | The number of tiles to be pushed     | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
++ */
++// clang-format on
++ALWI void cb_push_back_(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_push_tiles<false, false>(cbid, ntiles))); }
++
++
++
+ // clang-format off
+ /**
+  * A blocking call that waits for the specified number of tiles to be available in the specified circular buffer (CB).
+@@ -34,10 +88,10 @@ namespace ckernel {
+  *
+  * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
+  * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
+- * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     | 
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
+  * | ntiles    | The number of tiles to wait for      | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
+  * */
+- // clang-format on
++// clang-format on
+ ALWI void cb_wait_front(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_wait_tiles(cbid, ntiles))); }
+ 
+ // clang-format off
+@@ -66,10 +120,10 @@ ALWI void cb_wait_front(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_wait_tiles
+  *
+  * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
+  * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
+- * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     | 
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
+  * | ntiles    | The number of tiles to be popped     | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
+  */
+- // clang-format on
++// clang-format on
+ ALWI void cb_pop_front(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_pop_tiles(cbid, ntiles))); }
+ 
+ // clang-format off
+@@ -83,10 +137,10 @@ ALWI void cb_pop_front(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_pop_tiles(c
+  *
+  * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
+  * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
+- * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     | 
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
+  * | ntiles    | The number of free tiles to wait for | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
+  */
+- // clang-format on
++// clang-format on
+ ALWI void cb_reserve_back(uint32_t cbid, uint32_t ntiles) {
+     PACK((llk_wait_for_free_tiles<false, false, false>(cbid, ntiles)));
+ }
+@@ -117,10 +171,10 @@ ALWI void cb_reserve_back(uint32_t cbid, uint32_t ntiles) {
+  *
+  * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
+  * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
+- * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     | 
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
+  * | ntiles    | The number of tiles to be pushed     | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
+  */
+- // clang-format on
++// clang-format on
+ ALWI void cb_push_back(uint32_t cbid, uint32_t ntiles) { PACK((llk_push_tiles<false, false>(cbid, ntiles))); }
+ 
+ // clang-format off
+@@ -133,11 +187,11 @@ ALWI void cb_push_back(uint32_t cbid, uint32_t ntiles) { PACK((llk_push_tiles<fa
+  *
+  * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
+  * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
+- * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     | 
+- * | index     | The tile index within the CB         | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     | 
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | index     | The tile index within the CB         | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
+  * | p_tile    | The pointer that will be populated   | void*    | N/A                                                                                               | True     |
+  */
+- // clang-format on
++// clang-format on
+ ALWI void cb_get_tile(uint32_t cb_id, uint32_t index, volatile void* p_tile) {
+     UNPACK(llk_unpack_get_tile(cb_id, index, (uint32_t*)p_tile));
+ 
+@@ -167,3 +221,116 @@ ALWI void cb_release_tile(uint32_t cb_id) {
+ }
+ 
+ }  // namespace ckernel
++
++namespace single_thread {
++
++// clang-format off
++/**
++ * A blocking call that waits for the specified number of tiles to be available in the specified circular buffer (CB).
++ * This call is used by the consumer of the CB to wait for the producer to fill the CB with at least the specfied number
++ * of tiles. Important note: in case multiple calls of cb_wait_front(n) are issued without a paired cb_pop_front() call,
++ * n is expected to be incremented by the user to be equal to a cumulative total of tiles. Example: 4 calls of
++ * cb_wait_front(8) followed by a cb_pop_front(32) would produce incorrect behavior. Instead 4 calls of cb_wait_front()
++ * waiting on 8, 16, 24, 32 tiles should be issued.
++ *
++ * Important note: number of tiles used in all cb_* calls must evenly divide the cb size and must be the same number in
++ * all cb_wait_front calls in the same kernel. Example 1: cb_wait_front(32), cb_wait_front(40), cb_pop_front(32+8) tiles
++ * on a CB of size 64 would produce incorrect behavior. Example 2: cb_wait_front(3) on a cb of size 32 would also
++ * produce incorrect behavior. These limitations are due to performance optimizations in the CB implementation.
++ *
++ * Important note: CB total size must be an even multiple of the argument passed to this call.
++ *
++ * Return value: None
++ *
++ * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
++ * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | ntiles    | The number of tiles to wait for      | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
++ * */
++// clang-format on
++ALWI void cb_wait_front(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_wait_tiles(cbid, ntiles))); }
++
++// clang-format off
++/**
++ * Pops a specified number of tiles from the front of the specified CB. This
++ * also frees this number of tiles in the circular buffer. This call is used by
++ * the consumer to free up the space in the CB.
++ *
++ * We use the convention that the producer pushes tiles into the “back” of the
++ * CB queue and the consumer consumes tiles from the “front” of the CB queue.
++ *
++ * Note that the act of reading of the tile data from the CB does not free up
++ * the space in the CB. Waiting on available tiles and popping them is
++ * separated in order to allow the consumer to: 1) read the tile data from the
++ * CB via multiple reads of sub-tiles 2) access the tiles (or their sub-tiles)
++ * that are visible to the consumer by random access of the valid section of
++ * the CB
++ *
++ * Important note: This operation updates the read pointer of the CB, the CB pointer
++ * can only be updated from one thread at a time. Example: if compute kernel has cb_pop_front(input_id, 1)
++ * and writer kernel also has cb_pop_front(input_id, 1), these calls will produce non-deterministic behavior because
++ * cb pointers are not synchronized across threads. Per circular buffer index, only have one thread pop tiles
++ * to update the read pointer
++ *
++ * Return value: None
++ *
++ * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
++ * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | ntiles    | The number of tiles to be popped     | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
++ */
++// clang-format on
++ALWI void cb_pop_front(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_pop_tiles(cbid, ntiles))); }
++
++// clang-format off
++/**
++ * A blocking call that waits for the specified number of tiles to be free in the specified circular buffer. This call
++ * is used by the producer to wait for the consumer to consume (ie. free up) the specified number of tiles.
++ *
++ * CB total size must be an even multiple of the argument passed to this call.
++ *
++ * Return value: None
++ *
++ * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
++ * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | ntiles    | The number of free tiles to wait for | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
++ */
++// clang-format on
++ALWI void cb_reserve_back(uint32_t cbid, uint32_t ntiles) {
++    UNPACK((llk_wait_for_free_tiles<false, false, false>(cbid, ntiles)));
++}
++
++// clang-format off
++/**
++ * Pushes a given number of tiles in the back of the specified CB’s queue.
++ * Decreases the available space in the circular buffer by this number of
++ * tiles. This call is used by the producer to make the tiles visible to the
++ * consumer of the CB.
++ *
++ * We use the convention that the producer pushes tiles into the “back” of the
++ * CB queue and the consumer consumes tiles from the “front” of the CB queue.
++ *
++ * Note that the act of writing the tile data into the CB does not make the
++ * tiles visible to the consumer. Writing of the tiles and pushing is separated
++ * to allow the producer to: 1) write the tile data to the CB via multiple
++ * writes of sub-tiles 2) modify tiles (or sub-tiles) by random access of the
++ * valid section of the CB
++ *
++ * Important note: This operation updates the write pointer of the CB, the CB pointer
++ * can only be updated from one thread at a time. Example: if compute kernel has cb_push_back(output_id, 1)
++ * and reader kernel also has cb_push_back(output_id, 1), these calls will produce non-deterministic behavior because
++ * cb pointers are not synchronized across threads. Per circular buffer index, only have one thread push tiles
++ * to update the write pointer
++ *
++ * Return value: None
++ *
++ * | Argument  | Description                          | Type     | Valid Range                                                                                       | Required |
++ * |-----------|--------------------------------------|----------|---------------------------------------------------------------------------------------------------|----------|
++ * | cb_id     | The index of the cirular buffer (CB) | uint32_t | 0 to 31                                                                                           | True     |
++ * | ntiles    | The number of tiles to be pushed     | uint32_t | It must be less or equal than the size of the CB (the total number of tiles that fit into the CB) | True     |
++ */
++// clang-format on
++ALWI void cb_push_back(uint32_t cbid, uint32_t ntiles) { UNPACK((llk_push_tiles<false, false>(cbid, ntiles))); }
++
++}  // namespace single_thread
+diff --git a/tt_metal/include/compute_kernel_api/common_globals.h b/tt_metal/include/compute_kernel_api/common_globals.h
+index 56c5a64833..3b3044b16c 100644
+--- a/tt_metal/include/compute_kernel_api/common_globals.h
++++ b/tt_metal/include/compute_kernel_api/common_globals.h
+@@ -29,6 +29,9 @@
+ #endif
+ 
+ #ifdef TRISC_UNPACK
++#include "chlkc_math_fidelity.h"
++#include "llk_pack_api.h"
++#include "llk_math_common_api.h"
+ #include "llk_unpack_common_api.h"
+ #define UNPACK(x) x
+ #define MAIN unpack_main()
+diff --git a/tt_metal/include/compute_kernel_api/eltwise_binary_single_thread.h b/tt_metal/include/compute_kernel_api/eltwise_binary_single_thread.h
+new file mode 100644
+index 0000000000..809c10640e
+--- /dev/null
++++ b/tt_metal/include/compute_kernel_api/eltwise_binary_single_thread.h
+@@ -0,0 +1,85 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#pragma once
++
++#include "compute_kernel_api/common.h"
++#include "llk_math_binary_api.h"
++#include "llk_unpack_AB_api.h"
++#include "llk_unpack_A_api.h"
++#include "llk_pack_api.h"
++
++namespace single_thread {
++
++// clang-format off
++/**
++ * Init function for all binary ops
++ * Followed by the specific init required with an opcode (binrary_op_specific_init)
++ *
++ * | Argument       | Description                                                   | Type     | Valid Range                | Required |
++ * |----------------|---------------------------------------------------------------|----------|----------------------------|----------|
++ * | icb0           | The identifier of the circular buffer (CB) containing A       | uint32_t | 0 to 31                    | True     |
++ * | icb1           | The identifier of the circular buffer (CB) containing B       | uint32_t | 0 to 31                    | True     |
++ * | ocb            | The identifier of the circular buffer (CB) containing output  | uint32_t | 0 to 31, defaults to CB 16 | True     |
++ */
++// clang-format on
++ALWI void binary_op_init_common(uint32_t icb0, uint32_t icb1, uint32_t ocb) {
++    UNPACK((llk_unpack_AB_hw_configure_disaggregated<DST_ACCUM_MODE>(icb0, icb1)));
++
++    UNPACK((llk_math_pack_sync_init<DST_ACCUM_MODE>()));
++    UNPACK((llk_math_hw_configure_disaggregated(icb0, icb1)));
++
++    UNPACK((llk_pack_hw_configure_disaggregated<false, DST_ACCUM_MODE>(ocb)));
++    UNPACK((llk_pack_init_st(ocb)));
++    UNPACK((llk_pack_dest_init<false, DST_ACCUM_MODE>()));
++}
++
++// clang-format off
++ /**
++ * Template for initializing element-wise binary operations.
++ * Template parameters:
++ * full_init: if true, the full init is performed (unpack+math), otherwise only math init is performed
++ * eltwise_binary_type: the binary operation type
++ *
++ * Function
++ * | Argument       | Description                                                   | Type     | Valid Range | Required |
++ * |----------------|---------------------------------------------------------------|----------|-------------|----------|
++ * | icb0           | The identifier of the circular buffer (CB) containing A       | uint32_t | 0 to 31     | True     |
++ * | icb1           | The identifier of the circular buffer (CB) containing B       | uint32_t | 0 to 31     | True     |
++ * | acc_to_dest    | If true, operation = A [+,-,x] B + dst_tile_idx of *_tiles, depending on the eltwise_binary_type | bool | 0,1  | False |
++ */
++// clang-format on
++template <bool full_init, EltwiseBinaryType eltwise_binary_type>
++ALWI void binary_tiles_init(uint32_t icb0, uint32_t icb1, bool acc_to_dest = false) {
++    UNPACK((llk_unpack_AB_init_st(icb0, icb1, 0 /*transpose*/, acc_to_dest)));
++}
++
++// clang-format off
++/**
++ * Performs element-wise addition C=A+B of tiles in two CBs at given indices
++ * and writes the result to the DST register at index dst_tile_index. The DST
++ * register buffer must be in acquired state via *acquire_dst* call. This call
++ * is blocking and is only available on the compute engine.
++ *
++ * Return value: None
++ *
++ * | Argument       | Description                                              | Type     | Valid Range                                    | Required |
++ * |----------------|----------------------------------------------------------|----------|------------------------------------------------|----------|
++ * | in0_cb_id      | The identifier of the circular buffer (CB) containing A  | uint32_t | 0 to 31                                        | True     |
++ * | in1_cb_id      | The identifier of the circular buffer (CB) containing B  | uint32_t | 0 to 31                                        | True     |
++ * | in0_tile_index | The index of tile A within the first CB                  | uint32_t | Must be less than the size of the CB           | True     |
++ * | in1_tile_index | The index of tile B within the second CB                 | uint32_t | Must be less than the size of the CB           | True     |
++ * | dst_tile_index | The index of the tile in DST REG for the result C        | uint32_t | Must be less than the acquired size of DST REG | True     |
++ */
++// clang-format on
++ALWI void add_tiles(uint32_t icb0, uint32_t icb1, uint32_t itile0, uint32_t itile1, uint32_t idst) {
++    // This will do the task of both the unpacker and math.
++    // We can configure only one mop per thread and even if we could configure two mops
++    // And launch them in sequence, unpacker's mop would wait for clear signal from
++    // the math mop but math mop would not execute because it would trail the unpacker
++    // mop in the instruction pipeline, leading to a deadlock.
++    UNPACK((llk_unpack_AB_st(icb0, icb1, itile0, itile1, idst)));
++}
++
++}  // namespace single_thread
+diff --git a/tt_metal/include/compute_kernel_api/pack.h b/tt_metal/include/compute_kernel_api/pack.h
+index 16c996690d..6da5029207 100644
+--- a/tt_metal/include/compute_kernel_api/pack.h
++++ b/tt_metal/include/compute_kernel_api/pack.h
+@@ -35,11 +35,11 @@ namespace ckernel {
+  *
+  * | Argument       | Description                                       | Type     | Valid Range                                         | Required |
+  * |----------------|---------------------------------------------------|----------|-----------------------------------------------------|----------|
+- * | ifrom_dst      | The index of the tile in the DST register         | uint32_t | Must be less than the size of the DST register (16) | True     | 
+- * | icb            | The identifier of the output circular buffer (CB) | uint32_t | 0 to 31                                             | True     | 
++ * | ifrom_dst      | The index of the tile in the DST register         | uint32_t | Must be less than the size of the DST register (16) | True     |
++ * | icb            | The identifier of the output circular buffer (CB) | uint32_t | 0 to 31                                             | True     |
+  * | icb_tile       | The index of the tile in the output CB to copy to | uint32_t | Must be less than the size of the CB                | True     |
+  */
+- // clang-format on
++// clang-format on
+ template <bool out_of_order_output = false>
+ ALWI void pack_tile(uint32_t ifrom_dst, uint32_t icb, std::uint32_t output_tile_index = 0) {
+     PACK((llk_pack<out_of_order_output, false, DST_ACCUM_MODE>(ifrom_dst, icb, output_tile_index)));
+@@ -71,11 +71,11 @@ ALWI void pack_tile(uint32_t ifrom_dst, uint32_t icb, std::uint32_t output_tile_
+  *
+  * | Argument       | Description                                       | Type     | Valid Range                                         | Required |
+  * |----------------|---------------------------------------------------|----------|-----------------------------------------------------|----------|
+- * | ifrom_dst      | The index of the tile in the DST register         | uint32_t | Must be less than the size of the DST register (16) | True     | 
+- * | icb            | The identifier of the output circular buffer (CB) | uint32_t | 0 to 31                                             | True     | 
++ * | ifrom_dst      | The index of the tile in the DST register         | uint32_t | Must be less than the size of the DST register (16) | True     |
++ * | icb            | The identifier of the output circular buffer (CB) | uint32_t | 0 to 31                                             | True     |
+  * | ntiles         | The number of tiles to copy from DST to CB        | uint32_t | Must be less than the size of the CB                | True     |
+  */
+- // clang-format on
++// clang-format on
+ ALWI void matmul_pack_tile(uint32_t ifrom_dst, uint32_t icb, uint32_t ntiles) {
+     PACK((llk_matmul_pack<false, false, DST_ACCUM_MODE>(ifrom_dst, icb, ntiles)));
+ }
+@@ -100,3 +100,44 @@ ALWI void pack_reconfig_data_format(const uint32_t old_operand, const uint32_t n
+ ALWI void pack_reconfig_l1_acc(const uint32_t l1_acc_en) { PACK((llk_pack_reconfig_l1_acc(l1_acc_en))); }
+ 
+ }  // namespace ckernel
++
++namespace single_thread {
++
++// clang-format off
++/**
++ * Copies a single tile from the DST register buffer at a specified index to a
++ * specified CB at a given index. For the out_tile_index to be valid for this
++ * call, cb_reserve_back(n) has to be called first to reserve at least some
++ * number n > 0 of tiles in the output CB. out_tile_index = 0 then references
++ * the first tile in the reserved section of the CB, up to index n - 1, which will
++ * then be visible to the consumer in the same order after a cb_push_back call.
++ * The DST register buffer must be in acquired state via *acquire_dst* call.
++ * This call is blocking and is only available on the compute engine.
++ *
++ * Each subsequent pack call will increment the write pointer in the cb by single
++ * tile size. The pointer is then again set to a valid position with space for n
++ * reserved tiles by another cb_reserve_back call.
++ *
++ * Operates in tandem with functions cb_reserve_back and cb_push_back.
++ *
++ * A typical use case is first the producer ensures that there is a number of
++ * tiles available in the buffer via cb_reserve_back, then the producer uses
++ * the pack_tile call to copy a tile from one of DST slots to a slot in
++ * reserved space and finally cb_push_back is called to announce visibility of
++ * the reserved section of the circular buffer to the consumer.
++ *
++ * Return value: None
++ *
++ * | Argument       | Description                                       | Type     | Valid Range                                         | Required |
++ * |----------------|---------------------------------------------------|----------|-----------------------------------------------------|----------|
++ * | ifrom_dst      | The index of the tile in the DST register         | uint32_t | Must be less than the size of the DST register (16) | True     |
++ * | icb            | The identifier of the output circular buffer (CB) | uint32_t | 0 to 31                                             | True     |
++ * | icb_tile       | The index of the tile in the output CB to copy to | uint32_t | Must be less than the size of the CB                | True     |
++ */
++// clang-format on
++template <bool out_of_order_output = false>
++ALWI void pack_tile(uint32_t ifrom_dst, uint32_t icb, std::uint32_t output_tile_index = 0) {
++    UNPACK((llk_pack_st<out_of_order_output, false, DST_ACCUM_MODE>(ifrom_dst, icb, output_tile_index)));
++}
++
++}  // namespace single_thread
+diff --git a/tt_metal/kernels/dataflow/writer_unary.cpp b/tt_metal/kernels/dataflow/writer_unary.cpp
+index adddd7b20b..ae6e9f1a1d 100644
+--- a/tt_metal/kernels/dataflow/writer_unary.cpp
++++ b/tt_metal/kernels/dataflow/writer_unary.cpp
+@@ -3,10 +3,9 @@
+ // SPDX-License-Identifier: Apache-2.0
+ 
+ #include "dataflow_api.h"
+-#include "debug/dprint.h"
+ 
+ void kernel_main() {
+-    uint32_t dst_addr  = get_arg_val<uint32_t>(0);
++    uint32_t dst_addr = get_arg_val<uint32_t>(0);
+     uint32_t bank_id = get_arg_val<uint32_t>(1);
+     uint32_t num_tiles = get_arg_val<uint32_t>(2);
+ 
+diff --git a/tt_metal/programming_examples/CMakeLists.txt b/tt_metal/programming_examples/CMakeLists.txt
+index 46892de3cf..d2bd45e226 100644
+--- a/tt_metal/programming_examples/CMakeLists.txt
++++ b/tt_metal/programming_examples/CMakeLists.txt
+@@ -15,7 +15,10 @@ set(PROGRAMMING_EXAMPLES_SRCS
+     ${CMAKE_CURRENT_SOURCE_DIR}/matmul_multicore_reuse_mcast/matmul_multicore_reuse_mcast.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/matmul_single_core/matmul_single_core.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/pad/pad_multi_core.cpp
++    ${CMAKE_CURRENT_SOURCE_DIR}/penta_thread_eltwise_binary/penta_thread_eltwise_binary.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/sharding/shard_data_rm.cpp
++    ${CMAKE_CURRENT_SOURCE_DIR}/single_thread_eltwise_binary/single_thread_eltwise_binary.cpp
++    ${CMAKE_CURRENT_SOURCE_DIR}/triple_thread_eltwise_binary/triple_thread_eltwise_binary.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/vecadd_sharding/vecadd_sharding.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/vecadd_multi_core/vecadd_multi_core.cpp
+ )
+diff --git a/tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary.cpp b/tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary.cpp
+new file mode 100644
+index 0000000000..fb716ddd06
+--- /dev/null
++++ b/tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary.cpp
+@@ -0,0 +1,61 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <cstdint>
++
++// Sinlge threaded counterparts of existing multithreaded functions
++// are differentiated with an extra _ (underscore)
++#include "compute_kernel_api/eltwise_binary_single_thread.h"
++#include "dataflow_api.h"
++
++namespace NAMESPACE {
++void MAIN {
++    // Args for computing the results
++    // How many blocks of tiles to work on
++    uint32_t per_core_block_cnt = get_arg_val<uint32_t>(0);
++
++    // How many tiles per block; needs to be less than
++    // circular buffer capacity.
++    uint32_t per_core_block_size = get_arg_val<uint32_t>(1);
++
++    // Input and output circular buffer ids.
++    constexpr auto cb_in0 = tt::CBIndex::c_0;
++    constexpr auto cb_in1 = tt::CBIndex::c_1;
++    constexpr auto cb_out0 = tt::CBIndex::c_16;
++
++    // Initialize the parts that are common among binary operations
++    single_thread::binary_op_init_common(cb_in0, cb_in1, cb_out0);
++
++    // Initialize the parts that required specifically for this binary operatoins
++    single_thread::binary_tiles_init<false, EltwiseBinaryType::ELWADD>(cb_in0, cb_in1);
++
++    for (uint32_t block = 0; block < per_core_block_cnt; block++) {
++        // Wait for the input circular buffers to be filled with per_core_block_size tiles
++        single_thread::cb_wait_front(cb_in0, per_core_block_size);
++        single_thread::cb_wait_front(cb_in1, per_core_block_size);
++
++        // Perform the elementwise operation on the tiles in the block
++        // and store them in the destination register
++        for (uint32_t i = 0; i < per_core_block_size; ++i) {
++            single_thread::add_tiles(cb_in0, cb_in1, i, i, i);
++        }
++
++        // Wait for enough space to be available in the output circular buffer
++        single_thread::cb_reserve_back(cb_out0, per_core_block_size);
++
++        // Pack all the output tiles from destination register out to
++        // the output circular buffer that resides in L1 memory
++        for (uint32_t i = 0; i < per_core_block_size; ++i) {
++            single_thread::pack_tile(i, cb_out0);
++        }
++
++        // Update the write pointer and counts for the output circular buffer.
++        single_thread::cb_push_back(cb_out0, per_core_block_size);
++
++        // Pop out the used input tiles
++        single_thread::cb_pop_front(cb_in0, per_core_block_size);
++        single_thread::cb_pop_front(cb_in1, per_core_block_size);
++    }
++}
++}  // namespace NAMESPACE
+diff --git a/tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary_with_read_write.cpp b/tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary_with_read_write.cpp
+new file mode 100644
+index 0000000000..7903229b8a
+--- /dev/null
++++ b/tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary_with_read_write.cpp
+@@ -0,0 +1,77 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <cstdint>
++
++// Sinlge threaded counterparts of existing multithreaded functions
++// are differentiated with an extra _ (underscore)
++#include "compute_kernel_api/eltwise_binary_single_thread.h"
++#include "dataflow_api.h"
++
++namespace NAMESPACE {
++void MAIN {
++    // Args for reading data from DRAM
++    uint32_t src0_addr = get_arg_val<uint32_t>(0);
++    uint32_t src0_bank_id = get_arg_val<uint32_t>(1);
++    uint32_t src1_addr = get_arg_val<uint32_t>(2);
++    uint32_t src1_bank_id = get_arg_val<uint32_t>(3);
++
++    // Args for computing the results
++    // How many blocks of tiles to work on
++    uint32_t per_core_block_cnt = get_arg_val<uint32_t>(4);
++
++    // How many tiles per block; needs to be less than
++    // circular buffer capacity.
++    uint32_t per_core_block_size = get_arg_val<uint32_t>(5);
++
++    // For writing out the results
++    uint32_t dst_addr = get_arg_val<uint32_t>(6);
++    uint32_t dst_bank_id = get_arg_val<uint32_t>(7);
++
++    // Input and output circular buffer ids.
++    constexpr auto cb_in0 = tt::CBIndex::c_0;
++    constexpr auto cb_in1 = tt::CBIndex::c_1;
++    constexpr auto cb_out0 = tt::CBIndex::c_16;
++
++    // single-tile ublocks
++    uint32_t ublock_size_bytes_0 = get_tile_size(cb_in0);
++    uint32_t ublock_size_bytes_1 = get_tile_size(cb_in1);
++    uint32_t ublock_size_bytes_dst = get_tile_size(cb_out0);
++
++    // Initialize the parts that are common among binary operations
++    single_thread::binary_op_init_common(cb_in0, cb_in1, cb_out0);
++
++    // Initialize the parts that required specifically for this binary operatoins
++    single_thread::binary_tiles_init<false, EltwiseBinaryType::ELWADD>(cb_in0, cb_in1);
++
++    for (uint32_t block = 0; block < per_core_block_cnt; block++) {
++        single_thread::cb_push_back_from_dram(src0_bank_id, src0_addr, cb_in0, per_core_block_size);
++        src0_addr += ublock_size_bytes_0 * per_core_block_size;
++
++        single_thread::cb_push_back_from_dram(src1_bank_id, src1_addr, cb_in1, per_core_block_size);
++        src1_addr += ublock_size_bytes_1 * per_core_block_size;
++
++        // Perform the elementwise operation on the tiles in the block
++        // and store them in the destination register
++        for (uint32_t i = 0; i < per_core_block_size; ++i) {
++            single_thread::add_tiles(cb_in0, cb_in1, i, i, i);
++        }
++
++        // Pack all the output tiles from destination register out to
++        // the output circular buffer that resides in L1 memory
++        for (uint32_t i = 0; i < per_core_block_size; ++i) {
++            single_thread::pack_tile(i, cb_out0);
++        }
++
++        // Update the write pointer and counts for the output circular buffer.
++        single_thread::cb_push_back(cb_out0, per_core_block_size);
++        single_thread::cb_pop_front_to_dram(dst_bank_id, dst_addr, cb_out0, per_core_block_size);
++        dst_addr += ublock_size_bytes_dst * per_core_block_size;
++
++        // Pop out the used input tiles
++        single_thread::cb_pop_front(cb_in0, per_core_block_size);
++        single_thread::cb_pop_front(cb_in1, per_core_block_size);
++    }
++}
++}  // namespace NAMESPACE
+diff --git a/tt_metal/programming_examples/kernels/compute/triple_thread_eltwise_binary.cpp b/tt_metal/programming_examples/kernels/compute/triple_thread_eltwise_binary.cpp
+new file mode 100644
+index 0000000000..b62664408d
+--- /dev/null
++++ b/tt_metal/programming_examples/kernels/compute/triple_thread_eltwise_binary.cpp
+@@ -0,0 +1,75 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <cstdint>
++
++// Sinlge threaded counterparts of existing multithreaded functions
++// are differentiated with an extra _ (underscore)
++#include "compute_kernel_api/eltwise_binary.h"
++#include "dataflow_api.h"
++
++namespace NAMESPACE {
++void MAIN {
++    // Args for computing the results
++    // How many blocks of tiles to work on
++    uint32_t per_core_block_cnt = get_arg_val<uint32_t>(0);
++
++    // How many tiles per block; needs to be less than
++    // circular buffer capacity.
++    uint32_t per_core_block_size = get_arg_val<uint32_t>(1);
++
++    // Input and output circular buffer ids.
++    constexpr auto cb_in0 = tt::CBIndex::c_0;
++    constexpr auto cb_in1 = tt::CBIndex::c_1;
++    constexpr auto cb_out0 = tt::CBIndex::c_16;
++
++    // Initialize the parts that are common among binary operations
++    binary_op_init_common(cb_in0, cb_in1, cb_out0);
++
++    // Initialize the parts that required specifically for this binary operatoins
++    binary_tiles_init<false, EltwiseBinaryType::ELWADD>(cb_in0, cb_in1);
++
++    for (uint32_t block = 0; block < per_core_block_cnt; block++) {
++        // Wait for the input circular buffers to be filled with per_core_block_size tiles
++        cb_wait_front(cb_in0, per_core_block_size);
++        cb_wait_front(cb_in1, per_core_block_size);
++
++        // Wait for enough space to be available in the output circular buffer
++        cb_reserve_back(cb_out0, per_core_block_size);
++
++        // Math thread wait for desination register to be available,
++        // That is make sure packer is not using the waited upon part
++        tile_regs_acquire();
++
++        // Perform the elementwise operation on the tiles in the block
++        // and store them in the destination register
++        for (uint32_t i = 0; i < per_core_block_size; ++i) {
++            add_tiles(cb_in0, cb_in1, i, i, i);
++        }
++
++        // Math thread signals it is done with the destination register
++        tile_regs_commit();
++
++        // Pack thread waits for math thread's signal that it is done
++        // with its section of the destination register
++        tile_regs_wait();
++
++        // Pack all the output tiles from destination register out to
++        // the output circular buffer that resides in L1 memory
++        for (uint32_t i = 0; i < per_core_block_size; ++i) {
++            pack_tile(i, cb_out0);
++        }
++
++        // Pack thread signals it is done with the destination register
++        tile_regs_release();
++
++        // Update the write pointer and counts for the output circular buffer.
++        cb_push_back(cb_out0, per_core_block_size);
++
++        // Pop out the used input tiles
++        cb_pop_front(cb_in0, per_core_block_size);
++        cb_pop_front(cb_in1, per_core_block_size);
++    }
++}
++}  // namespace NAMESPACE
+diff --git a/tt_metal/programming_examples/kernels/dataflow/reader_binary.cpp b/tt_metal/programming_examples/kernels/dataflow/reader_binary.cpp
+new file mode 100644
+index 0000000000..f58ab3d37e
+--- /dev/null
++++ b/tt_metal/programming_examples/kernels/dataflow/reader_binary.cpp
+@@ -0,0 +1,44 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <stdint.h>
++#include "dataflow_api.h"
++
++void kernel_main() {
++    uint32_t src0_addr = get_arg_val<uint32_t>(0);
++    uint32_t src0_bank_id = get_arg_val<uint32_t>(1);
++    uint32_t src1_addr = get_arg_val<uint32_t>(2);
++    uint32_t src1_bank_id = get_arg_val<uint32_t>(3);
++    uint32_t num_tiles = get_arg_val<uint32_t>(4);
++
++    constexpr uint32_t cb_id_in0 = 0;
++    constexpr uint32_t cb_id_in1 = 1;
++
++    // single-tile ublocks
++    uint32_t ublock_size_bytes_0 = get_tile_size(cb_id_in0);
++    uint32_t ublock_size_bytes_1 = get_tile_size(cb_id_in1);
++    uint32_t ublock_size_tiles = 1;
++
++    uint32_t l1_write_addr_in0;
++    uint32_t l1_write_addr_in1;
++
++    // read ublocks from src0/src1 to CB0/CB1, then push ublocks to compute (unpacker)
++    for (uint32_t i = 0; i < num_tiles; i += ublock_size_tiles) {
++        uint64_t src0_noc_addr = get_noc_addr_from_bank_id<true>(src0_bank_id, src0_addr);
++        cb_reserve_back(cb_id_in0, ublock_size_tiles);
++        l1_write_addr_in0 = get_write_ptr(cb_id_in0);
++        noc_async_read(src0_noc_addr, l1_write_addr_in0, ublock_size_bytes_0);
++        noc_async_read_barrier();
++        cb_push_back(cb_id_in0, ublock_size_tiles);
++        src0_addr += ublock_size_bytes_0;
++
++        uint64_t src1_noc_addr = get_noc_addr_from_bank_id<true>(src1_bank_id, src1_addr);
++        cb_reserve_back(cb_id_in1, ublock_size_tiles);
++        l1_write_addr_in1 = get_write_ptr(cb_id_in1);
++        noc_async_read(src1_noc_addr, l1_write_addr_in1, ublock_size_bytes_1);
++        noc_async_read_barrier();
++        cb_push_back(cb_id_in1, ublock_size_tiles);
++        src1_addr += ublock_size_bytes_1;
++    }
++}
+diff --git a/tt_metal/programming_examples/kernels/dataflow/writer_unary.cpp b/tt_metal/programming_examples/kernels/dataflow/writer_unary.cpp
+new file mode 100644
+index 0000000000..ae6e9f1a1d
+--- /dev/null
++++ b/tt_metal/programming_examples/kernels/dataflow/writer_unary.cpp
+@@ -0,0 +1,30 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include "dataflow_api.h"
++
++void kernel_main() {
++    uint32_t dst_addr = get_arg_val<uint32_t>(0);
++    uint32_t bank_id = get_arg_val<uint32_t>(1);
++    uint32_t num_tiles = get_arg_val<uint32_t>(2);
++
++    constexpr uint32_t cb_id_out0 = tt::CBIndex::c_16;
++
++    // single-tile ublocks
++    uint32_t ublock_size_bytes = get_tile_size(cb_id_out0);
++    uint32_t ublock_size_tiles = 1;
++
++    for (uint32_t i = 0; i < num_tiles; i += ublock_size_tiles) {
++        uint64_t dst_noc_addr = get_noc_addr_from_bank_id<true>(bank_id, dst_addr);
++
++        cb_wait_front(cb_id_out0, ublock_size_tiles);
++        uint32_t l1_read_addr = get_read_ptr(cb_id_out0);
++        noc_async_write(l1_read_addr, dst_noc_addr, ublock_size_bytes);
++
++        noc_async_write_barrier();
++
++        cb_pop_front(cb_id_out0, ublock_size_tiles);
++        dst_addr += ublock_size_bytes;
++    }
++}
+diff --git a/tt_metal/programming_examples/penta_thread_eltwise_binary/penta_thread_eltwise_binary.cpp b/tt_metal/programming_examples/penta_thread_eltwise_binary/penta_thread_eltwise_binary.cpp
+new file mode 100644
+index 0000000000..356a592f20
+--- /dev/null
++++ b/tt_metal/programming_examples/penta_thread_eltwise_binary/penta_thread_eltwise_binary.cpp
+@@ -0,0 +1,194 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <algorithm>
++#include <functional>
++#include <random>
++
++#include <tt-metalium/host_api.hpp>
++#include <tt-metalium/device.hpp>
++#include <tt-metalium/bfloat16.hpp>
++#include <magic_enum/magic_enum.hpp>
++
++using namespace tt;
++using namespace tt::tt_metal;
++
++/*
++ * 1. Host creates two vectors of data.
++ * 2. Device eltwise adds them together.
++ * 3. Intermediate result read back to host.
++ * 6. Read result back and compare to golden.
++ * */
++
++int main() {
++    if (getenv("TT_METAL_SLOW_DISPATCH_MODE") != nullptr) {
++        TT_THROW("Test not supported w/ slow dispatch, exiting");
++    }
++
++    bool pass = true;
++
++    try {
++        /*
++         * Silicon accelerator setup
++         */
++        constexpr int device_id = 0;
++        IDevice* device = CreateDevice(device_id);
++
++        /*
++         * Setup program to execute along with its buffers and kernels to use
++         */
++        CommandQueue& cq = device->command_queue();
++
++        Program program = CreateProgram();
++
++        constexpr CoreCoord core = {0, 0};
++
++        constexpr uint32_t single_tile_size = 2 * 1024;
++        constexpr uint32_t num_tiles = 64;
++        constexpr uint32_t block_size = 8;
++        constexpr uint32_t dram_buffer_size =
++            single_tile_size * num_tiles;  // num_tiles of FP16_B, hard-coded in the reader/writer kernels
++
++        tt_metal::InterleavedBufferConfig dram_config{
++            .device = device,
++            .size = dram_buffer_size,
++            .page_size = dram_buffer_size,
++            .buffer_type = tt_metal::BufferType::DRAM};
++
++        std::shared_ptr<tt::tt_metal::Buffer> src0_dram_buffer = CreateBuffer(dram_config);
++        std::shared_ptr<tt::tt_metal::Buffer> src1_dram_buffer = CreateBuffer(dram_config);
++        std::shared_ptr<tt::tt_metal::Buffer> dst_dram_buffer = CreateBuffer(dram_config);
++        // Since all interleaved buffers have size == page_size, they are entirely contained in the first DRAM bank
++        uint32_t src0_bank_id = 0;
++        uint32_t src1_bank_id = 0;
++        uint32_t dst_bank_id = 0;
++        /*
++         * Use circular buffers to set input and output buffers that the
++         * compute engine will use.
++         */
++        constexpr uint32_t src0_cb_index = tt::CBIndex::c_0;
++        constexpr uint32_t num_input_tiles = block_size * 2;
++        CircularBufferConfig cb_src0_config =
++            CircularBufferConfig(num_input_tiles * single_tile_size, {{src0_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(src0_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_src0_config);
++
++        constexpr uint32_t src1_cb_index = tt::CBIndex::c_1;
++        CircularBufferConfig cb_src1_config =
++            CircularBufferConfig(num_input_tiles * single_tile_size, {{src1_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(src1_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_src1_config);
++
++        constexpr uint32_t output_cb_index = tt::CBIndex::c_16;
++        constexpr uint32_t num_output_tiles = block_size * 2;
++        CircularBufferConfig cb_output_config =
++            CircularBufferConfig(num_output_tiles * single_tile_size, {{output_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(output_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_output_config);
++
++        /*
++         * Specify data movement kernels for reading/writing data to/from
++         * DRAM.
++         */
++        KernelHandle binary_reader_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/dataflow/reader_binary.cpp",
++            core,
++            DataMovementConfig{.processor = DataMovementProcessor::RISCV_1, .noc = NOC::RISCV_1_default});
++
++        KernelHandle unary_writer_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/dataflow/writer_unary.cpp",
++            core,
++            DataMovementConfig{.processor = DataMovementProcessor::RISCV_0, .noc = NOC::RISCV_0_default});
++
++        /*
++         * Set the parameters that the compute kernel will use.
++         */
++        std::vector<uint32_t> compute_kernel_args = {};
++
++        constexpr bool fp32_dest_acc_en = false;
++        constexpr bool math_approx_mode = false;
++
++        /*
++         * Use the add_tiles operation available in the eltwise_binary
++         * compute kernel.
++         */
++        KernelHandle eltwise_binary_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/compute/triple_thread_eltwise_binary.cpp",
++            core,
++            ComputeConfig{
++                .math_fidelity = MathFidelity::HiFi4,
++                .fp32_dest_acc_en = fp32_dest_acc_en,
++                .math_approx_mode = math_approx_mode,
++                .compile_args = compute_kernel_args});
++
++        /*
++         * Create source data and write to DRAM.
++         */
++        std::vector<uint32_t> src0_vec = create_random_vector_of_bfloat16(
++            dram_buffer_size, 1, std::chrono::system_clock::now().time_since_epoch().count());
++
++        EnqueueWriteBuffer(cq, src0_dram_buffer, src0_vec, false);
++
++        constexpr float val_to_add = -2.0f;
++        std::vector<uint32_t> src1_vec = create_constant_vector_of_bfloat16(dram_buffer_size, val_to_add);
++
++        EnqueueWriteBuffer(cq, src1_dram_buffer, src1_vec, false);
++
++        /*
++         * Configure program and runtime kernel arguments, then execute.
++         */
++
++        SetRuntimeArgs(
++            program,
++            binary_reader_kernel_id,
++            core,
++            {src0_dram_buffer->address(), src0_bank_id, src1_dram_buffer->address(), src1_bank_id, num_tiles});
++
++        SetRuntimeArgs(program, eltwise_binary_kernel_id, core, {num_tiles / block_size, block_size});
++
++        SetRuntimeArgs(program, unary_writer_kernel_id, core, {dst_dram_buffer->address(), dst_bank_id, num_tiles});
++
++        EnqueueProgram(cq, program, false);
++        Finish(cq);
++
++        /*
++         * Read in result into a host vector.
++         */
++        std::vector<uint32_t> result_vec;
++        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
++
++        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
++
++        auto transform_to_golden = [](const bfloat16& a) { return bfloat16(a.to_float() + val_to_add); };
++        std::vector<uint32_t> golden_vec =
++            pack_bfloat16_vec_into_uint32_vec(unpack_uint32_vec_into_bfloat16_vec(src0_vec, transform_to_golden));
++
++        constexpr float abs_tolerance = 0.01f;
++        constexpr float rel_tolerance = 0.001f;
++        auto comparison_function = [](const float a, const float b) {
++            return is_close(a, b, rel_tolerance, abs_tolerance);
++        };
++
++        pass &= packed_uint32_t_vector_comparison(golden_vec, result_vec, comparison_function);
++
++        pass &= CloseDevice(device);
++
++    } catch (const std::exception& e) {
++        tt::log_error(tt::LogTest, "Test failed with exception!");
++        tt::log_error(tt::LogTest, "{}", e.what());
++
++        throw;
++    }
++
++    if (pass) {
++        tt::log_info(tt::LogTest, "Test Passed");
++    } else {
++        TT_THROW("Test Failed");
++    }
++
++    return 0;
++}
+diff --git a/tt_metal/programming_examples/single_thread_eltwise_binary/single_thread_eltwise_binary.cpp b/tt_metal/programming_examples/single_thread_eltwise_binary/single_thread_eltwise_binary.cpp
+new file mode 100644
+index 0000000000..6d02849d5a
+--- /dev/null
++++ b/tt_metal/programming_examples/single_thread_eltwise_binary/single_thread_eltwise_binary.cpp
+@@ -0,0 +1,183 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <algorithm>
++#include <functional>
++#include <random>
++
++#include <tt-metalium/host_api.hpp>
++#include <tt-metalium/device.hpp>
++#include <tt-metalium/bfloat16.hpp>
++#include <magic_enum/magic_enum.hpp>
++
++using namespace tt;
++using namespace tt::tt_metal;
++
++/*
++ * 1. Host creates two vectors of data.
++ * 2. Device eltwise adds them together.
++ * 3. Intermediate result read back to host.
++ * 6. Read result back and compare to golden.
++ * */
++
++int main() {
++    if (getenv("TT_METAL_SLOW_DISPATCH_MODE") != nullptr) {
++        TT_THROW("Test not supported w/ slow dispatch, exiting");
++    }
++
++    bool pass = true;
++
++    try {
++        /*
++         * Silicon accelerator setup
++         */
++        constexpr int device_id = 0;
++        IDevice* device = CreateDevice(device_id);
++
++        /*
++         * Setup program to execute along with its buffers and kernels to use
++         */
++        CommandQueue& cq = device->command_queue();
++
++        Program program = CreateProgram();
++
++        constexpr CoreCoord core = {0, 0};
++
++        constexpr uint32_t single_tile_size = 2 * 1024;
++        constexpr uint32_t num_tiles = 64;
++        constexpr uint32_t block_size = 8;
++        constexpr uint32_t dram_buffer_size =
++            single_tile_size * num_tiles;  // num_tiles of FP16_B, hard-coded in the reader/writer kernels
++
++        tt_metal::InterleavedBufferConfig dram_config{
++            .device = device,
++            .size = dram_buffer_size,
++            .page_size = dram_buffer_size,
++            .buffer_type = tt_metal::BufferType::DRAM};
++
++        std::shared_ptr<tt::tt_metal::Buffer> src0_dram_buffer = CreateBuffer(dram_config);
++        std::shared_ptr<tt::tt_metal::Buffer> src1_dram_buffer = CreateBuffer(dram_config);
++        std::shared_ptr<tt::tt_metal::Buffer> dst_dram_buffer = CreateBuffer(dram_config);
++
++        // Since all interleaved buffers have size == page_size, they are entirely contained in the first DRAM bank
++        uint32_t src0_bank_id = 0;
++        uint32_t src1_bank_id = 0;
++        uint32_t dst_bank_id = 0;
++
++        /*
++         * Use circular buffers to set input and output buffers that the
++         * compute engine will use.
++         */
++        constexpr uint32_t src0_cb_index = tt::CBIndex::c_0;
++        constexpr uint32_t num_input_tiles = block_size * 2;
++        CircularBufferConfig cb_src0_config =
++            CircularBufferConfig(num_input_tiles * single_tile_size, {{src0_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(src0_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_src0_config);
++
++        constexpr uint32_t src1_cb_index = tt::CBIndex::c_1;
++        CircularBufferConfig cb_src1_config =
++            CircularBufferConfig(num_input_tiles * single_tile_size, {{src1_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(src1_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_src1_config);
++
++        constexpr uint32_t output_cb_index = tt::CBIndex::c_16;
++        constexpr uint32_t num_output_tiles = block_size * 2;
++        CircularBufferConfig cb_output_config =
++            CircularBufferConfig(num_output_tiles * single_tile_size, {{output_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(output_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_output_config);
++
++        /*
++         * Set the parameters that the compute kernel will use.
++         */
++        std::vector<uint32_t> compute_kernel_args = {};
++
++        constexpr bool fp32_dest_acc_en = false;
++        constexpr bool math_approx_mode = false;
++
++        /*
++         * Use the add_tiles operation available in the eltwise_binary
++         * compute kernel.
++         */
++        KernelHandle eltwise_binary_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary_with_read_write.cpp",
++            core,
++            ComputeConfig{
++                .math_fidelity = MathFidelity::HiFi4,
++                .fp32_dest_acc_en = fp32_dest_acc_en,
++                .math_approx_mode = math_approx_mode,
++                .compile_args = compute_kernel_args});
++
++        /*
++         * Create source data and write to DRAM.
++         */
++        std::vector<uint32_t> src0_vec = create_random_vector_of_bfloat16(
++            dram_buffer_size, 1, std::chrono::system_clock::now().time_since_epoch().count());
++
++        EnqueueWriteBuffer(cq, src0_dram_buffer, src0_vec, false);
++
++        constexpr float val_to_add = -2.0f;
++        std::vector<uint32_t> src1_vec = create_constant_vector_of_bfloat16(dram_buffer_size, val_to_add);
++
++        EnqueueWriteBuffer(cq, src1_dram_buffer, src1_vec, false);
++
++        /*
++         * Configure program and runtime kernel arguments, then execute.
++         */
++
++        SetRuntimeArgs(
++            program,
++            eltwise_binary_kernel_id,
++            core,
++            {src0_dram_buffer->address(),
++             src0_bank_id,
++             src1_dram_buffer->address(),
++             src1_bank_id,
++             num_tiles / block_size,
++             block_size,
++             dst_dram_buffer->address(),
++             dst_bank_id});
++
++        EnqueueProgram(cq, program, false);
++        Finish(cq);
++
++        /*
++         * Read in result into a host vector.
++         */
++        std::vector<uint32_t> result_vec;
++        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
++
++        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
++
++        auto transform_to_golden = [](const bfloat16& a) { return bfloat16(a.to_float() + val_to_add); };
++        std::vector<uint32_t> golden_vec =
++            pack_bfloat16_vec_into_uint32_vec(unpack_uint32_vec_into_bfloat16_vec(src0_vec, transform_to_golden));
++
++        constexpr float abs_tolerance = 0.01f;
++        constexpr float rel_tolerance = 0.001f;
++        auto comparison_function = [](const float a, const float b) {
++            return is_close(a, b, rel_tolerance, abs_tolerance);
++        };
++
++        pass &= packed_uint32_t_vector_comparison(golden_vec, result_vec, comparison_function);
++
++        pass &= CloseDevice(device);
++
++    } catch (const std::exception& e) {
++        tt::log_error(tt::LogTest, "Test failed with exception!");
++        tt::log_error(tt::LogTest, "{}", e.what());
++
++        throw;
++    }
++
++    if (pass) {
++        tt::log_info(tt::LogTest, "Test Passed");
++    } else {
++        TT_THROW("Test Failed");
++    }
++
++    return 0;
++}
+diff --git a/tt_metal/programming_examples/triple_thread_eltwise_binary/triple_thread_eltwise_binary.cpp b/tt_metal/programming_examples/triple_thread_eltwise_binary/triple_thread_eltwise_binary.cpp
+new file mode 100644
+index 0000000000..5305950148
+--- /dev/null
++++ b/tt_metal/programming_examples/triple_thread_eltwise_binary/triple_thread_eltwise_binary.cpp
+@@ -0,0 +1,194 @@
++// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
++//
++// SPDX-License-Identifier: Apache-2.0
++
++#include <algorithm>
++#include <functional>
++#include <random>
++
++#include <tt-metalium/host_api.hpp>
++#include <tt-metalium/device.hpp>
++#include <tt-metalium/bfloat16.hpp>
++#include <magic_enum/magic_enum.hpp>
++
++using namespace tt;
++using namespace tt::tt_metal;
++
++/*
++ * 1. Host creates two vectors of data.
++ * 2. Device eltwise adds them together.
++ * 3. Intermediate result read back to host.
++ * 6. Read result back and compare to golden.
++ * */
++
++int main() {
++    if (getenv("TT_METAL_SLOW_DISPATCH_MODE") != nullptr) {
++        TT_THROW("Test not supported w/ slow dispatch, exiting");
++    }
++
++    bool pass = true;
++
++    try {
++        /*
++         * Silicon accelerator setup
++         */
++        constexpr int device_id = 0;
++        IDevice* device = CreateDevice(device_id);
++
++        /*
++         * Setup program to execute along with its buffers and kernels to use
++         */
++        CommandQueue& cq = device->command_queue();
++
++        Program program = CreateProgram();
++
++        constexpr CoreCoord core = {0, 0};
++
++        constexpr uint32_t single_tile_size = 2 * 1024;
++        constexpr uint32_t num_tiles = 64;
++        constexpr uint32_t block_size = 8;
++        constexpr uint32_t dram_buffer_size =
++            single_tile_size * num_tiles;  // num_tiles of FP16_B, hard-coded in the reader/writer kernels
++
++        tt_metal::InterleavedBufferConfig dram_config{
++            .device = device,
++            .size = dram_buffer_size,
++            .page_size = dram_buffer_size,
++            .buffer_type = tt_metal::BufferType::DRAM};
++
++        std::shared_ptr<tt::tt_metal::Buffer> src0_dram_buffer = CreateBuffer(dram_config);
++        std::shared_ptr<tt::tt_metal::Buffer> src1_dram_buffer = CreateBuffer(dram_config);
++        std::shared_ptr<tt::tt_metal::Buffer> dst_dram_buffer = CreateBuffer(dram_config);
++        // Since all interleaved buffers have size == page_size, they are entirely contained in the first DRAM bank
++        uint32_t src0_bank_id = 0;
++        uint32_t src1_bank_id = 0;
++        uint32_t dst_bank_id = 0;
++        /*
++         * Use circular buffers to set input and output buffers that the
++         * compute engine will use.
++         */
++        constexpr uint32_t src0_cb_index = tt::CBIndex::c_0;
++        constexpr uint32_t num_input_tiles = block_size * 2;
++        CircularBufferConfig cb_src0_config =
++            CircularBufferConfig(num_input_tiles * single_tile_size, {{src0_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(src0_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_src0_config);
++
++        constexpr uint32_t src1_cb_index = tt::CBIndex::c_1;
++        CircularBufferConfig cb_src1_config =
++            CircularBufferConfig(num_input_tiles * single_tile_size, {{src1_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(src1_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_src1_config);
++
++        constexpr uint32_t output_cb_index = tt::CBIndex::c_16;
++        constexpr uint32_t num_output_tiles = block_size * 2;
++        CircularBufferConfig cb_output_config =
++            CircularBufferConfig(num_output_tiles * single_tile_size, {{output_cb_index, tt::DataFormat::Float16_b}})
++                .set_page_size(output_cb_index, single_tile_size);
++        tt_metal::CreateCircularBuffer(program, core, cb_output_config);
++
++        /*
++         * Specify data movement kernels for reading/writing data to/from
++         * DRAM.
++         */
++        KernelHandle binary_reader_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/dataflow/reader_binary.cpp",
++            core,
++            DataMovementConfig{.processor = DataMovementProcessor::RISCV_1, .noc = NOC::RISCV_1_default});
++
++        KernelHandle unary_writer_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/dataflow/writer_unary.cpp",
++            core,
++            DataMovementConfig{.processor = DataMovementProcessor::RISCV_0, .noc = NOC::RISCV_0_default});
++
++        /*
++         * Set the parameters that the compute kernel will use.
++         */
++        std::vector<uint32_t> compute_kernel_args = {};
++
++        constexpr bool fp32_dest_acc_en = false;
++        constexpr bool math_approx_mode = false;
++
++        /*
++         * Use the add_tiles operation available in the eltwise_binary
++         * compute kernel.
++         */
++        KernelHandle eltwise_binary_kernel_id = CreateKernel(
++            program,
++            "tt_metal/programming_examples/kernels/compute/single_thread_eltwise_binary.cpp",
++            core,
++            ComputeConfig{
++                .math_fidelity = MathFidelity::HiFi4,
++                .fp32_dest_acc_en = fp32_dest_acc_en,
++                .math_approx_mode = math_approx_mode,
++                .compile_args = compute_kernel_args});
++
++        /*
++         * Create source data and write to DRAM.
++         */
++        std::vector<uint32_t> src0_vec = create_random_vector_of_bfloat16(
++            dram_buffer_size, 1, std::chrono::system_clock::now().time_since_epoch().count());
++
++        EnqueueWriteBuffer(cq, src0_dram_buffer, src0_vec, false);
++
++        constexpr float val_to_add = -2.0f;
++        std::vector<uint32_t> src1_vec = create_constant_vector_of_bfloat16(dram_buffer_size, val_to_add);
++
++        EnqueueWriteBuffer(cq, src1_dram_buffer, src1_vec, false);
++
++        /*
++         * Configure program and runtime kernel arguments, then execute.
++         */
++
++        SetRuntimeArgs(
++            program,
++            binary_reader_kernel_id,
++            core,
++            {src0_dram_buffer->address(), src0_bank_id, src1_dram_buffer->address(), src1_bank_id, num_tiles});
++
++        SetRuntimeArgs(program, eltwise_binary_kernel_id, core, {num_tiles / block_size, block_size});
++
++        SetRuntimeArgs(program, unary_writer_kernel_id, core, {dst_dram_buffer->address(), dst_bank_id, num_tiles});
++
++        EnqueueProgram(cq, program, false);
++        Finish(cq);
++
++        /*
++         * Read in result into a host vector.
++         */
++        std::vector<uint32_t> result_vec;
++        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
++
++        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
++
++        auto transform_to_golden = [](const bfloat16& a) { return bfloat16(a.to_float() + val_to_add); };
++        std::vector<uint32_t> golden_vec =
++            pack_bfloat16_vec_into_uint32_vec(unpack_uint32_vec_into_bfloat16_vec(src0_vec, transform_to_golden));
++
++        constexpr float abs_tolerance = 0.01f;
++        constexpr float rel_tolerance = 0.001f;
++        auto comparison_function = [](const float a, const float b) {
++            return is_close(a, b, rel_tolerance, abs_tolerance);
++        };
++
++        pass &= packed_uint32_t_vector_comparison(golden_vec, result_vec, comparison_function);
++
++        pass &= CloseDevice(device);
++
++    } catch (const std::exception& e) {
++        tt::log_error(tt::LogTest, "Test failed with exception!");
++        tt::log_error(tt::LogTest, "{}", e.what());
++
++        throw;
++    }
++
++    if (pass) {
++        tt::log_info(tt::LogTest, "Test Passed");
++    } else {
++        TT_THROW("Test Failed");
++    }
++
++    return 0;
++}
+diff --git a/tt_metal/third_party/tt_llk b/tt_metal/third_party/tt_llk
+index 86a98910fb..1895375480 160000
+--- a/tt_metal/third_party/tt_llk
++++ b/tt_metal/third_party/tt_llk
+@@ -1 +1 @@
+-Subproject commit 86a98910fb09a46eac5f4e5e5b889aab2756dba6
++Subproject commit 1895375480055a72583ed2affd32a15bf9be3f69
