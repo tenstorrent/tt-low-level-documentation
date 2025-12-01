@@ -99,21 +99,22 @@ When the transaction finishes, we waste quite a bit of time before we issue the 
 Instead, we can do the following:
 
 ```cpp
-for(i in range num_of_trids):  
-   cb_reserve_back(cb, 1)  
-   write_addr[i] = get_write_ptr(cb)  
-   noc_set_trid(i)  
-   noc_async_read(dst_addr, write_addr[i])  
-    
-curr_trid = 0  
-for(i in range num_of_transactions):  
-   noc_read_barrier_with_trid(curr_trid)  
-   cb_push_back(cb, 1)  
-   if(i < num_of_transactions - num_of_trids):  
-       cb_reserve_back(cb, 1)  
-       noc_set_trid(curr_trid)  
-       noc_async_read(dst_addr, write_addr[i])  
-   curr_trid = (curr_trid+1) % num_of_trids
+cb_reserve_back(cb,num_of_trids);
+base_addr = get_write_ptr(cb);
+for(i in range num_of_trids):
+   noc_async_read_set_trid(i)
+   noc_async_read(dst_addr, base_addr + i * page_size)
+
+curr_trid = 0
+for(i in range num_of_transactions):
+   noc_read_barrier_with_trid(curr_trid)
+   cb_push_back(cb, 1)
+   if(i < num_of_transactions - num_of_trids):
+       cb_reserve_back(cb, 1)
+       write_addr = get_write_ptr(cb)
+       noc_async_read_set_trid(curr_trid)
+       noc_async_read(dst_addr, write_addr)
+   curr_trid = (curr_trid + 1) % num_of_trids
 ```
 
 The main difference here is that now the transaction has more time to arrive before we start waiting for it on the barrier. This way, we will spend less time waiting at the barrier, thus saving time.
@@ -150,29 +151,29 @@ If your buffer space is large enough (it can fit enough transactions), with 2 tr
 If the transaction size is small, your bandwidth is limited by the noc issue time, which isn’t helped by using transaction IDs.
 
 Here is an example of double buffering with transaction IDs implementation. This implementation doesn’t match the example above in 1:1, but it should provide a general idea.
+
 ```cpp
 constexpr uint32_t trid_base = 1;
-uint32_t write_addrs[num_of_trids];
 
-for (uint32_t trid = 0; trid < num_of_trids; trid++) {  
-    cb_reserve_back(cb_id_in0, 1);  
-    write_addrs[trid] = get_write_ptr(cb_id_in0);  
-    noc_async_read_set_trid(trid_base + trid);  
-    noc_async_read(target_noc_addr, write_addrs[trid], bytes_per_transaction);  
+cb_reserve_back(cb, num_of_trids);
+base_addr = get_write_ptr(cb);
+for (uint32_t trid = 0; trid < num_of_trids; trid++) {
+    noc_async_read_set_trid(trid_base + trid);
+    noc_async_read(target_noc_addr, base_addr + i * page_size, bytes_per_transaction);
 }
 
-uint32_t active_trid = 0;  
+uint32_t active_trid = 0;
 for (uint32_t i = 0; i < num_of_transactions; i++) {  
-    active_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;  
-    uint32_t trid = trid_base + active_trid;  
-    uint32_t next_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;  
-    noc_async_read_barrier_with_trid(next_trid + trid_base);  
+    active_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;
+    uint32_t trid = trid_base + active_trid;
+    uint32_t next_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;
+    noc_async_read_barrier_with_trid(next_trid + trid_base);
     cb_push_back(cb_id_in0, 1);
 
     if (i < num_of_transactions - num_of_trids) {  
-        cb_reserve_back(cb_id_in0, 1);  
-        noc_async_read_set_trid(trid);  
-        noc_async_read(target_noc_addr, write_addrs[active_trid], bytes_per_transaction);  
+        cb_reserve_back(cb_id_in0, 1);
+        noc_async_read_set_trid(trid);
+        noc_async_read(target_noc_addr, get_write_ptr(cb_id_in0), bytes_per_transaction);
     }  
 }
 ```
