@@ -242,3 +242,28 @@ It is essential to keep in mind that if you have sufficient buffer space, 2 tran
 <img src="images/plot-10.png" width="1200">
 
 From the previous plots, we can see that under 512B available buffer size, we see no benefit in using transaction IDs. This is because the cost of issuing a transaction under 256B is too high compared to the NoC transaction time.
+
+### Reads and Writes
+
+An example from a kernel and its corresponding performance plot from the transaction ID data movement tests are shown below:
+```cpp
+uint32_t tmp_local_addr = l1_local_addr;
+for (uint32_t i = 1; i <= num_of_transactions; i++) {
+    noc_async_read_set_trid(i);
+    noc_async_read(sub1_src_noc_addr, tmp_local_addr, bytes_per_transaction);
+    tmp_local_addr += bytes_per_transaction;
+    sub1_src_noc_addr += bytes_per_transaction;
+}
+
+tmp_local_addr = l1_local_addr;
+for (uint32_t i = 1; i <= num_of_transactions; i++) {
+    noc_async_read_barrier_with_trid(i);
+    noc_async_write(tmp_local_addr, sub0_dst_noc_addr, bytes_per_transaction);
+    tmp_local_addr += bytes_per_transaction;
+    sub0_dst_noc_addr += bytes_per_transaction;
+}
+noc_async_write_barrier();
+```
+<img src="images/plot-11.png" width=1200>
+
+The test issues reads on transaction IDs, and when a read has been completed (i.e. the trid barrier finishes), that data is written out. This write-after-read implementation appears to yield between 1.5x and 2x the theoretical bandwidth. This is because the NIU has an input and output port. We have a core that is sending and receiving data at the same time, with packets circulating around the torus. This does not happen in Read After Write tests because the read requests get stuck behind the larger write requests.
