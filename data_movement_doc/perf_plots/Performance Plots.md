@@ -187,6 +187,52 @@ This test sends to a large grid using linked multicast. Linked causes path reser
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
 
+#### Multicast Linked Semaphore
+##### 2x2
+##### With Loopback
+
+![One to All Multicast Linked Semaphore 2x2 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20with%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+
+##### Without Loopback
+
+![One to All Multicast Linked Semaphore 2x2 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20without%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+
+This test sends to a small grid using linked multicast with semaphore synchronization.
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
+
+##### 5x5
+##### With Loopback
+
+![One to All Multicast Linked Semaphore 5x5 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20with%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20with%20Loopback.csv).
+
+##### Without Loopback
+
+![One to All Multicast Linked Semaphore 5x5 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20without%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20without%20Loopback.csv).
+
+This test sends to a medium grid using linked multicast with semaphore synchronization.
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
+
+##### 11x10
+##### With Loopback
+
+![One to All Multicast Linked Semaphore 11x10 Packet Sizes with Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20with%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20with%20Loopback.csv).
+
+##### Without Loopback
+
+![One to All Multicast Linked Semaphore 11x10 Packet Sizes without Loopback](./wormhole_b0/images/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20without%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20without%20Loopback.csv).
+
+This test sends to a large grid using linked multicast with semaphore synchronization.
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
+
 ### One from All Packet Sizes
 
 ![One from All Packet Sizes](./wormhole_b0/images/One%20from%20All%20Packet%20Sizes.png)
@@ -384,6 +430,52 @@ To view these results in a table, refer to the relevant [csv](./blackhole/csv/On
 To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%2011x10%20Packet%20Sizes%20without%20Loopback.csv).
 
 This test sends to a large grid using linked multicast. Linked causes path reserve to be done only once for all transactions, as such performance approaches theoretical. As the grid size increases, the number of write acks increases which degrades bandwidth. Posted multicasts do not have this issue, however it is not safe to use posted multicast due to a hardware bug.
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
+
+#### Multicast Linked Semaphore
+##### 2x2
+##### With Loopback
+
+![One to All Multicast Linked Semaphore 2x2 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20with%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20with%20Loopback.csv).
+
+##### Without Loopback
+
+![One to All Multicast Linked Semaphore 2x2 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20without%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%202x2%20Packet%20Sizes%20without%20Loopback.csv).
+
+This test sends to a small grid using linked multicast with semaphore synchronization.
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
+
+##### 5x5
+##### With Loopback
+
+![One to All Multicast Linked Semaphore 5x5 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20with%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20with%20Loopback.csv).
+
+##### Without Loopback
+
+![One to All Multicast Linked Semaphore 5x5 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20without%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%205x5%20Packet%20Sizes%20without%20Loopback.csv).
+
+This test sends to a medium grid using linked multicast with semaphore synchronization.
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
+
+##### 11x10
+##### With Loopback
+
+![One to All Multicast Linked Semaphore 11x10 Packet Sizes with Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20with%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20with%20Loopback.csv).
+
+##### Without Loopback
+
+![One to All Multicast Linked Semaphore 11x10 Packet Sizes without Loopback](./blackhole/images/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20without%20Loopback.png)
+To view these results in a table, refer to the relevant [csv](./blackhole/csv/One%20to%20All%20Multicast%20Linked%20Semaphore%20Packet%20Sizes%20without%20Loopback.csv).
+
+This test sends to a large grid using linked multicast with semaphore synchronization.
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/one_to_all/README.md).
 
