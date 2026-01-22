@@ -14,5 +14,5 @@ Units are **Bytes/cycle**.
 | One To All (Unicast)                          | 31            | 62        |
 | One To All (Multicast)                        | 15            | 24        |
 | One To All (Multicast + Linked)               | 22            | 41        |
-| One To All (Multicast + Linked + Semaphore)   | 23            | 41        |
+| One To All (Multicast + Linked + Semaphore)   | 22            | 37        |
 | One From All                                  | 30            | 60        |
