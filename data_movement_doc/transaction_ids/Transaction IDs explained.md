@@ -87,7 +87,9 @@ We can use 2 transaction IDs here, and double buffer to try to hide some of the 
 
 ## Transaction IDs 
 
-Transaction IDs are bits stored inside the NoC packet used to identify them. This gives us an option to wait for specific packets instead of having to wait for all of them (noc\_async\_(read/write)\_barrier). 
+Transaction IDs are bits stored inside the NoC packet used to identify them. This gives us an option to wait for specific packets instead of having to wait for all of them (noc\_async\_(read/write)\_barrier).
+
+**Important:** Avoid using transaction ID 0, as it can cause issues. Always start your transaction IDs from 1. If you must use transaction ID 0, call `reset_noc_trid_barrier_counter(NOC_CLEAR_OUTSTANDING_REQ_MASK, noc_index)` to clear the barrier counters before using it. After you are done using transaction IDs, reset them back to 0 using `noc_async_read_set_trid(0)` and/or `noc_async_write_set_trid(0)`.
 
 Let’s look at the code example 3\. 
 
@@ -152,6 +154,7 @@ If the transaction size is small, your bandwidth is limited by the noc issue tim
 
 Here is an example of double buffering with transaction IDs implementation. This implementation doesn’t match the example above in 1:1, but it should provide a general idea.
 
+**Read example:**
 ```cpp
 constexpr uint32_t trid_base = 1;
 
@@ -163,19 +166,48 @@ for (uint32_t trid = 0; trid < num_of_trids; trid++) {
 }
 
 uint32_t active_trid = 0;
-for (uint32_t i = 0; i < num_of_transactions; i++) {  
+for (uint32_t i = 0; i < num_of_transactions; i++) {
     active_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;
     uint32_t trid = trid_base + active_trid;
     uint32_t next_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;
     noc_async_read_barrier_with_trid(next_trid + trid_base);
     cb_push_back(cb_id_in0, 1);
 
-    if (i < num_of_transactions - num_of_trids) {  
+    if (i < num_of_transactions - num_of_trids) {
         cb_reserve_back(cb_id_in0, 1);
         noc_async_read_set_trid(trid);
         noc_async_read(target_noc_addr, get_write_ptr(cb_id_in0), bytes_per_transaction);
-    }  
+    }
 }
+noc_async_read_set_trid(0);
+```
+
+**Write example:**
+```cpp
+constexpr uint32_t trid_base = 1;
+
+cb_wait_front(cb, num_of_trids);
+base_addr = get_read_ptr(cb);
+for (uint32_t trid = 0; trid < num_of_trids; trid++) {
+    noc_async_write_set_trid(trid_base + trid);
+    noc_async_write(base_addr + i * page_size, target_noc_addr, bytes_per_transaction);
+}
+
+uint32_t active_trid = 0;
+for (uint32_t i = 0; i < num_of_transactions; i++) {
+    active_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;
+    uint32_t trid = trid_base + active_trid;
+    uint32_t next_trid = active_trid == num_of_trids - 1 ? 0 : active_trid + 1;
+    noc_async_write_barrier_with_trid(next_trid + trid_base);
+    cb_pop_front(cb_id_in0, 1);
+
+    if (i < num_of_transactions - num_of_trids) {
+        cb_wait_front(cb_id_in0, 1);
+        noc_async_write_set_trid(trid);
+        noc_async_write(get_read_ptr(cb_id_in0), target_noc_addr, bytes_per_transaction);
+    }
+}
+noc_async_write_set_trid(0);
 ```
 ## Buffer size
 
