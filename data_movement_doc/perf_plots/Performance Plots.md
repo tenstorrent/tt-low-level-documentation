@@ -14,7 +14,7 @@ For more information on each test, refer to the README under each test primitive
 
 ### DRAM Interleaved Packet Sizes
 
-![DRAM Interleaved Packet Sizes](./wormhole_b0/images/DRAM%20Interleaved%20Packet%20Sizes.png)
+![DRAM Interleaved Packet Sizes](./wormhole_b0/images/DRAM%20Packet%20Sizes.png)
 To view these results in a table, refer to the relevant [csv](./wormhole_b0/csv/DRAM%20Interleaved%20Packet%20Sizes.csv).
 
 Dram read bandwidth saturates at about 37 B/cycle, according to HW experiments. DRAM write bandwidth should saturate at 64 B/cycle, instead of 35 B/c. There may be some configuration problem with the dram controller/phy or this may be the physical limit of the dram.
@@ -260,7 +260,7 @@ For more information on this primitive, refer to [README](https://github.com/ten
 
 ### DRAM Interleaved Packet Sizes
 
-![DRAM Interleaved Packet Sizes](./blackhole/images/DRAM%20Interleaved%20Packet%20Sizes.png)
+![DRAM Interleaved Packet Sizes](./blackhole/images/DRAM%20Packet%20Sizes.png)
 To view these results in a table, refer to the relevant [csv](./blackhole/csv/DRAM%20Interleaved%20Packet%20Sizes.csv).
 
 Dram read bandwidth saturates at about 37 B/cycle, according to HW experiments. DRAM write bandwidth should saturate at 64 B/cycle, instead of 35 B/c. There may be some configuration problem with the dram controller/phy or this may be the physical limit of the dram.
