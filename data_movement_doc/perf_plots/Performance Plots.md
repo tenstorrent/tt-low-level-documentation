@@ -505,6 +505,9 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ## Quasar
 
 > Results collected on the `emu-quasar-1x3` emulator (test id 912, single DM core).
+> Each timed region repeats the write(+flush) **100 times** inside one profiler zone and
+> the reported value is the zone duration divided by the iteration count, so fixed
+> per-run overhead is amortized and the numbers reflect steady-state per-write cost.
 > Because the 1x3 emulator has no fast-dispatch cores, runs execute in slow-dispatch
 > mode, under which the profiler does not increment `run_host_id`; the plotted per-run
 > values are reconstructed from the profiler CSV in execution order.
@@ -518,13 +521,20 @@ Compares single-DM-core write performance to Tensix L1, swept over total data si
 - **Uncached (8B)** — same uncached port, but 64-bit stores (the natural DM-core store width).
 - **Cached+Flush (8B)** — 64-bit cacheable stores then `flush_l2_cache_range` (`ceil(N/64)` 64B line flushes).
 
-Key takeaways:
+Key takeaways (amortized cycles per write):
 
-- **Store width dominates the uncached port.** Byte-at-a-time uncached writes are catastrophic at scale (each byte pays full TL1 latency): ~24.3k cycles for 2KB versus ~3.7k cycles for the same 2KB with 8-byte stores — roughly a 6–7x difference.
-- **Cache + flush does not help write-only, no-reuse traffic.** At a fixed 8-byte store width, `Cached+Flush (8B)` is consistently a bit *slower* than plain `Uncached (8B)` (e.g. 4818 vs 3706 cycles at 2KB) because the `ceil(N/64)` line flushes add overhead with no read-reuse benefit. The cache path would only pay off with subsequent reads or scattered sub-line updates.
-- The top row is duration (cycles); the bottom row is the same data as bandwidth (bytes/cycle); the right column zooms into the 0–64B region.
+- **Store width dominates the uncached port.** With 8-byte stores the uncached port costs ~13–14 cycles per store (e.g. 64B in ~109 cycles, 2KB in ~3.4k); byte-at-a-time is ~8x worse (2KB in ~24.3k) since each byte pays full TL1 latency. Below 8B the two uncached modes coincide (a sub-8B write is a byte write either way).
+- **`flush_l2_cache_range` has a fixed ~160-cycle floor.** `Cached+Flush (8B)` is essentially flat at ~160–190 cycles up to one cache line (64B), then grows with `ceil(N/64)` line flushes. It is slower than plain `Uncached (8B)` across the whole range for this write-only, no-reuse pattern; it would only pay off with subsequent reads or scattered sub-line updates.
+- Top row is duration (amortized cycles/write); bottom row is bandwidth (bytes/cycle); the right column zooms into the 0–64B region. The step in `Uncached (8B)` at 8B is where real 64-bit stores replace the byte tail.
 
-> Note: an earlier byte-granular-only version of this test suggested cache+flush was ~2x faster; that was an artifact of writing the uncached path one byte at a time. With realistic 8-byte stores the uncached port wins for write-only traffic.
+**When to use which (write-only to L1):**
+
+- **Any size, fire-and-forget writes → uncached port with 8-byte stores.** It is fastest at every size in this sweep; cache+flush is never faster.
+- **< 8 bytes → uncached** (store width is irrelevant below 8B). Cache+flush costs its ~160-cycle flush floor, 3–10x worse.
+- **Cache + `flush_l2_cache_range` → only with reuse.** It pays off when the written data is subsequently *read back* by the core, or when many scattered sub-64B updates coalesce in cache before a single flush. This write-only, no-reuse test does not exercise those cases, so it shows cache+flush purely as overhead.
+- The intuitive "cached beats uncached above some size" only holds against *byte-granular* uncached writes (Uncached-1B loses to cache+flush above ~16B); wide (8B) uncached beats both everywhere, so the real lesson is to use 8-byte stores.
+
+> Note: an earlier version of this test wrote byte-at-a-time and timed a single un-amortized pass, which suggested cache+flush was ~2x faster. Both were artifacts (byte-granular writes + a ~325-cycle fixed measurement overhead). With 8-byte stores and 100-iteration amortization the numbers align with prior standalone measurements (uncached ~15 cyc/store, cache+flush ~160-cycle flush floor).
 
 ![Quasar Cache Write Sizes](./quasar/images/Quasar%20Cache%20Write%20Sizes.png)
 To view these results in a table, refer to the relevant [csv](./quasar/csv/Quasar%20Cache%20Write%20Sizes.csv).
