@@ -501,3 +501,24 @@ For more information on this primitive, refer to [README](https://github.com/ten
 To view these results in a table, refer to the relevant [csv](./blackhole/csv/All%20from%20All%20Packet%20Sizes.csv).
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/all_from_all/README.md).
+
+## Quasar
+
+> Results collected on the `emu-quasar-1x3` emulator (test id 912, single DM core).
+> Because the 1x3 emulator has no fast-dispatch cores, runs execute in slow-dispatch
+> mode, under which the profiler does not increment `run_host_id`; the plotted per-run
+> values are reconstructed from the profiler CSV in execution order.
+
+### Quasar Cache Write Sizes
+
+Compares single-DM-core write performance to Tensix L1 via the uncached port
+(`base + MEM_L1_UNCACHED_BASE`, +4MB alias) versus cacheable writes followed by
+`flush_l2_cache_range` (which flushes `ceil(N/64)` 64B lines), swept over total
+data size (1B–2KB). Below ~16–32B the uncached path is faster (cached+flush pays a
+fixed flush overhead); above the crossover, cached+flush is up to ~2x faster. The
+right panel zooms into the 0–64B crossover region.
+
+![Quasar Cache Write Sizes](./quasar/images/Quasar%20Cache%20Write%20Sizes.png)
+To view these results in a table, refer to the relevant [csv](./quasar/csv/Quasar%20Cache%20Write%20Sizes.csv).
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/quasar_cache_perf/README.md).
