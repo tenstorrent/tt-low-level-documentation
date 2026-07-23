@@ -511,12 +511,20 @@ For more information on this primitive, refer to [README](https://github.com/ten
 
 ### Quasar Cache Write Sizes
 
-Compares single-DM-core write performance to Tensix L1 via the uncached port
-(`base + MEM_L1_UNCACHED_BASE`, +4MB alias) versus cacheable writes followed by
-`flush_l2_cache_range` (which flushes `ceil(N/64)` 64B lines), swept over total
-data size (1B–2KB). Below ~16–32B the uncached path is faster (cached+flush pays a
-fixed flush overhead); above the crossover, cached+flush is up to ~2x faster. The
-right panel zooms into the 0–64B crossover region.
+Compares single-DM-core write performance to Tensix L1, swept over total data size
+(1B–2KB), across three write modes:
+
+- **Uncached (1B)** — uncached port (`base + MEM_L1_UNCACHED_BASE`, +4MB alias), byte-at-a-time stores.
+- **Uncached (8B)** — same uncached port, but 64-bit stores (the natural DM-core store width).
+- **Cached+Flush (8B)** — 64-bit cacheable stores then `flush_l2_cache_range` (`ceil(N/64)` 64B line flushes).
+
+Key takeaways:
+
+- **Store width dominates the uncached port.** Byte-at-a-time uncached writes are catastrophic at scale (each byte pays full TL1 latency): ~24.3k cycles for 2KB versus ~3.7k cycles for the same 2KB with 8-byte stores — roughly a 6–7x difference.
+- **Cache + flush does not help write-only, no-reuse traffic.** At a fixed 8-byte store width, `Cached+Flush (8B)` is consistently a bit *slower* than plain `Uncached (8B)` (e.g. 4818 vs 3706 cycles at 2KB) because the `ceil(N/64)` line flushes add overhead with no read-reuse benefit. The cache path would only pay off with subsequent reads or scattered sub-line updates.
+- The top row is duration (cycles); the bottom row is the same data as bandwidth (bytes/cycle); the right column zooms into the 0–64B region.
+
+> Note: an earlier byte-granular-only version of this test suggested cache+flush was ~2x faster; that was an artifact of writing the uncached path one byte at a time. With realistic 8-byte stores the uncached port wins for write-only traffic.
 
 ![Quasar Cache Write Sizes](./quasar/images/Quasar%20Cache%20Write%20Sizes.png)
 To view these results in a table, refer to the relevant [csv](./quasar/csv/Quasar%20Cache%20Write%20Sizes.csv).
