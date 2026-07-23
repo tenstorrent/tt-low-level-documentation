@@ -515,26 +515,27 @@ For more information on this primitive, refer to [README](https://github.com/ten
 ### Quasar Cache Write Sizes
 
 Compares single-DM-core write performance to Tensix L1, swept over total data size
-(1B–2KB), across three write modes:
+(8B–2KB, multiples of 8), across four write modes:
 
-- **Uncached (1B)** — uncached port (`base + MEM_L1_UNCACHED_BASE`, +4MB alias), byte-at-a-time stores.
-- **Uncached (8B)** — same uncached port, but 64-bit stores (the natural DM-core store width).
-- **Cached+Flush (8B)** — 64-bit cacheable stores then `flush_l2_cache_range` (`ceil(N/64)` 64B line flushes).
+- **Uncached (1B stores)** — uncached port (`base + MEM_L1_UNCACHED_BASE`, +4MB alias), one byte at a time.
+- **Uncached (8B stores)** — same uncached port, 64-bit stores (the natural DM-core store width).
+- **Cached + flush (fence per line)** — 64-bit cacheable stores, then the library `flush_l2_cache_range`, which fences twice per 64B line.
+- **Cached + flush (single fence)** — identical cacheable stores, then bare flush-register writes over the touched lines with a single completion fence after all iterations.
 
 Key takeaways (amortized cycles per write):
 
-- **Store width dominates the uncached port.** With 8-byte stores the uncached port costs ~13–14 cycles per store (e.g. 64B in ~109 cycles, 2KB in ~3.4k); byte-at-a-time is ~8x worse (2KB in ~24.3k) since each byte pays full TL1 latency. Below 8B the two uncached modes coincide (a sub-8B write is a byte write either way).
-- **`flush_l2_cache_range` has a fixed ~160-cycle floor.** `Cached+Flush (8B)` is essentially flat at ~160–190 cycles up to one cache line (64B), then grows with `ceil(N/64)` line flushes. It is slower than plain `Uncached (8B)` across the whole range for this write-only, no-reuse pattern; it would only pay off with subsequent reads or scattered sub-line updates.
-- Top row is duration (amortized cycles/write); bottom row is bandwidth (bytes/cycle); the right column zooms into the 0–64B region. The step in `Uncached (8B)` at 8B is where real 64-bit stores replace the byte tail.
+- **Store width dominates the uncached port.** 8-byte stores cost ~13–14 cyc/store (64B ≈ 141, 2KB ≈ 3.4k); byte-at-a-time is ~8x worse (2KB ≈ 24.3k) since each byte pays full TL1 latency.
+- **How you flush matters a lot.** The single-fence flush is much cheaper than the library per-line-fenced `flush_l2_cache_range` — e.g. 2KB: ~3.9k vs ~4.4k cycles, and at small sizes ~95 vs ~165. Prefer the single-fence pattern for multi-line flushes.
+- **Cache+flush still does not beat uncached-8B here.** Even with the efficient flush, uncached-8B is fastest at every size (2KB: ~3.4k vs ~3.9k). Cache+flush would only pay off with subsequent reads or scattered sub-64B updates that coalesce before one flush — cases this write-only, no-reuse test does not exercise.
+- Top row is duration (amortized cycles/write); bottom row is bandwidth (bytes/cycle); the right column zooms into the ≤64B region.
 
 **When to use which (write-only to L1):**
 
-- **Any size, fire-and-forget writes → uncached port with 8-byte stores.** It is fastest at every size in this sweep; cache+flush is never faster.
-- **< 8 bytes → uncached** (store width is irrelevant below 8B). Cache+flush costs its ~160-cycle flush floor, 3–10x worse.
-- **Cache + `flush_l2_cache_range` → only with reuse.** It pays off when the written data is subsequently *read back* by the core, or when many scattered sub-64B updates coalesce in cache before a single flush. This write-only, no-reuse test does not exercise those cases, so it shows cache+flush purely as overhead.
-- The intuitive "cached beats uncached above some size" only holds against *byte-granular* uncached writes (Uncached-1B loses to cache+flush above ~16B); wide (8B) uncached beats both everywhere, so the real lesson is to use 8-byte stores.
+- **Any size, fire-and-forget writes → uncached port with 8-byte stores** (fastest at every size in this sweep).
+- **If you must flush, use the single-fence pattern, not `flush_l2_cache_range`** — the library's per-line fencing is the dominant cost for multi-line ranges.
+- **Cache + flush → only with reuse** (data read back, or repeated sub-line updates that coalesce before one flush).
 
-> Note: an earlier version of this test wrote byte-at-a-time and timed a single un-amortized pass, which suggested cache+flush was ~2x faster. Both were artifacts (byte-granular writes + a ~325-cycle fixed measurement overhead). With 8-byte stores and 100-iteration amortization the numbers align with prior standalone measurements (uncached ~15 cyc/store, cache+flush ~160-cycle flush floor).
+> Note: earlier iterations of this test were misleading due to measurement bugs (byte-at-a-time writes, a single un-amortized timed pass, and a missing completion fence on the uncached path). With 8-byte stores, per-iteration completion fences, and 100-iteration amortization, the uncached numbers align with prior standalone measurements (~15 cyc per 8-byte store).
 
 ![Quasar Cache Write Sizes](./quasar/images/Quasar%20Cache%20Write%20Sizes.png)
 To view these results in a table, refer to the relevant [csv](./quasar/csv/Quasar%20Cache%20Write%20Sizes.csv).
