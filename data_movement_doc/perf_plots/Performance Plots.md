@@ -501,3 +501,43 @@ For more information on this primitive, refer to [README](https://github.com/ten
 To view these results in a table, refer to the relevant [csv](./blackhole/csv/All%20from%20All%20Packet%20Sizes.csv).
 
 For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/all_from_all/README.md).
+
+## Quasar
+
+> Results collected on the `emu-quasar-1x3` emulator (test id 912, single DM core).
+> Each timed region repeats the write(+flush) **100 times** inside one profiler zone and
+> the reported value is the zone duration divided by the iteration count, so fixed
+> per-run overhead is amortized and the numbers reflect steady-state per-write cost.
+> Because the 1x3 emulator has no fast-dispatch cores, runs execute in slow-dispatch
+> mode, under which the profiler does not increment `run_host_id`; the plotted per-run
+> values are reconstructed from the profiler CSV in execution order.
+
+### Quasar Cache Write Sizes
+
+Compares single-DM-core write performance to Tensix L1, swept over total data size
+(8B–2KB, multiples of 8), across four write modes:
+
+- **Uncached (1B stores)** — uncached port (`base + MEM_L1_UNCACHED_BASE`, +4MB alias), one byte at a time.
+- **Uncached (8B stores)** — same uncached port, 64-bit stores (the natural DM-core store width).
+- **Cached + flush (fence per line)** — 64-bit cacheable stores, then the library `flush_l2_cache_range`, which fences twice per 64B line.
+- **Cached + flush (single fence)** — identical cacheable stores, then bare flush-register writes over the touched lines with a single completion fence after all iterations.
+
+Key takeaways (amortized cycles per write):
+
+- **Store width dominates the uncached port.** 8-byte stores cost ~13–14 cyc/store (64B ≈ 141, 2KB ≈ 3.4k); byte-at-a-time is ~8x worse (2KB ≈ 24.3k) since each byte pays full TL1 latency.
+- **How you flush matters a lot.** The single-fence flush is much cheaper than the library per-line-fenced `flush_l2_cache_range` — e.g. 2KB: ~3.9k vs ~4.4k cycles, and at small sizes ~95 vs ~165. Prefer the single-fence pattern for multi-line flushes.
+- **Cache+flush still does not beat uncached-8B here.** Even with the efficient flush, uncached-8B is fastest at every size (2KB: ~3.4k vs ~3.9k). Cache+flush would only pay off with subsequent reads or scattered sub-64B updates that coalesce before one flush — cases this write-only, no-reuse test does not exercise.
+- Top row is duration (amortized cycles/write); bottom row is bandwidth (bytes/cycle); the right column zooms into the ≤64B region.
+
+**When to use which (write-only to L1):**
+
+- **Any size, fire-and-forget writes → uncached port with 8-byte stores** (fastest at every size in this sweep).
+- **If you must flush, use the single-fence pattern, not `flush_l2_cache_range`** — the library's per-line fencing is the dominant cost for multi-line ranges.
+- **Cache + flush → only with reuse** (data read back, or repeated sub-line updates that coalesce before one flush).
+
+> Note: earlier iterations of this test were misleading due to measurement bugs (byte-at-a-time writes, a single un-amortized timed pass, and a missing completion fence on the uncached path). With 8-byte stores, per-iteration completion fences, and 100-iteration amortization, the uncached numbers align with prior standalone measurements (~15 cyc per 8-byte store).
+
+![Quasar Cache Write Sizes](./quasar/images/Quasar%20Cache%20Write%20Sizes.png)
+To view these results in a table, refer to the relevant [csv](./quasar/csv/Quasar%20Cache%20Write%20Sizes.csv).
+
+For more information on this primitive, refer to [README](https://github.com/tenstorrent/tt-metal/tree/main/tests/tt_metal/tt_metal/data_movement/quasar_cache_perf/README.md).
